@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>middleman — つながる</title>
+<style>
+  :root{--bg:#f4f7fa;--panel:#fff;--ink:#16202b;--muted:#6b7a8a;--line:#e2e8ee;--blue:#1f6feb;--green:#1f9d63;--red:#d1495b}
+  *{box-sizing:border-box}
+  body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN",system-ui,sans-serif;color:var(--ink)}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:34px;width:min(400px,92vw);
+    text-align:center;box-shadow:0 12px 40px rgba(22,40,60,.1)}
+  .ava{width:72px;height:72px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;font-size:26px;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
+  h1{font-size:19px;margin:0 0 6px}
+  .sub{color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:8px}
+  .tag{display:inline-block;font-size:11px;padding:3px 10px;border-radius:999px;margin-top:6px}
+  .tag.eng{background:#fff4e6;color:#c05621}
+  code{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--muted)}
+  button{margin-top:22px;background:var(--blue);color:#fff;border:0;border-radius:12px;padding:13px 26px;
+    font-size:14px;font-weight:600;cursor:pointer}
+  .err{color:var(--red)}
+</style>
+</head>
+<body>
+  <div class="box" id="box"><div class="sub">つないでいます…</div></div>
+<script>
+const el=(t,c)=>{const n=document.createElement(t);if(c)n.className=c;return n;};
+function show(nodes){const b=document.getElementById('box');b.textContent='';nodes.forEach(n=>b.append(n));}
+function fail(msg){
+  const h=el('h1');h.textContent='つながれませんでした';const s=el('div','sub err');s.textContent=msg;
+  const btn=el('button');btn.textContent='middlemanを開く';btn.onclick=()=>location.href='/';
+  show([h,s,btn]);
+}
+(async()=>{
+  const m=location.hash.match(/i=([A-Za-z0-9\-_]+)/);
+  if(!m)return fail('招待リンクが不正です。');
+  let bundle;
+  try{ bundle=JSON.parse(atob(m[1].replace(/-/g,'+').replace(/_/g,'/'))); }catch(e){ return fail('招待リンクを読めませんでした。'); }
+  // fragmentは履歴・スクショに残り得るので即消す（codexレビュー）
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}
+  const r=await (await fetch('/api/scan',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({bundle,via:'link'})})).json();
+  if(r.error){ return fail(r.error==='expired'?'この招待リンクは期限切れです（5分）。相手に新しいリンクを送ってもらってください。':'招待リンクの検証に失敗しました。'); }
+  const dev=(bundle.device_id||'').slice(0,2).toUpperCase();
+  const ava=el('div','ava');ava.textContent=dev||'？';
+  const h=el('h1');h.textContent='つながりました';
+  const s=el('div','sub');s.textContent='相手をEngagedに追加しました。これで非同期にやり取りできます。';
+  const tag=el('div','tag eng');tag.textContent='engaged（未検証）';
+  const note=el('div','sub');note.style.marginTop='12px';
+  note.textContent='中間者ゼロの「検証済み」に上げるには、対面でQRをかざすか、合言葉を一度だけ確認します（設定の奥）。';
+  const btn=el('button');btn.textContent='middlemanを開く';btn.onclick=()=>location.href='/';
+  show([ava,h,s,tag,note,btn]);
+})();
+</script>
+</body>
+</html>

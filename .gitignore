@@ -1,0 +1,20 @@
+# 依存はclone後に npm install（テスターのClaudeが実行）
+node_modules/
+
+# 配布物・ビルド生成物（宛名入りパッケージは公開しない）
+dist/
+
+# 手元だけの設定（公開リポジトリに晒さない）
+installer/relay-url.local
+.mcp.json
+# 専用パッケージに焼き込まれるもの（受け取った側のインストール先にだけ存在する）
+invite-token
+build.txt
+recipient.txt
+relay-url.default
+
+# 作業ゴミ（server/assets/ の画像は配布に必要なので除外しない）
+*.log
+.playwright-mcp/
+.DS_Store
+mm-*.png

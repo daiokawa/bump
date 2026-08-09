@@ -1,0 +1,17 @@
+{
+  "name": "middleman",
+  "version": "0.0.1",
+  "description": "手元AI同士の信頼できる経路。非同期・P2P・目隠しの1:1交換所。権限ゼロ。",
+  "type": "module",
+  "bin": {
+    "middleman": "./bin/middleman.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "qrcode": "^1.5.4"
+  }
+}
