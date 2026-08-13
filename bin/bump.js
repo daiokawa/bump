@@ -79,7 +79,7 @@ async function cmdId() {
 }
 
 // いま動いている版を答える。パッケージには build.txt を焼き込むので、gitの無い配布先でも分かる。
-// これが無いと「自分が何を使っているか」を誰も答えられない（加賀爪さんの版が判別できなかった
+// これが無いと「自分が何を使っているか」を誰も答えられない（K.K.の版が判別できなかった
 // 2026-08-04）。リポジトリで動かしている場合は git の最新コミットを見る。
 async function cmdVersion() {
   const stamp = await readFile(join(__dir, '..', 'build.txt'), 'utf8').catch(() => '');
@@ -284,8 +284,8 @@ async function cmdDaemon(flags) {
       const p = pairPaths(pairId);
       // 初見の縁は「取り込む前に手元にあった分」だけを既知にする。
       // 以前は取り込んだ後に初回をまるごと黙らせていたため、Macを落としている間に届いた手紙も
-      // 起動直後の取り込みで一緒に飲み込まれ、通知が鳴らなかった（北原さん報告 2026-08-04。
-      // 杉田さんの7/28の手紙が3日間気づかれないまま埋もれた）。
+      // 起動直後の取り込みで一緒に飲み込まれ、通知が鳴らなかった（Y.K.報告 2026-08-04。
+      // K.S.の7/28の手紙が3日間気づかれないまま埋もれた）。
       if (!seen[pairId]) {
         seen[pairId] = new Set();
         for (const f of await listBox(p.messages, '.msg.json')) {
@@ -311,7 +311,7 @@ async function cmdDaemon(flags) {
         const short = tf('[bump] {n} new letter(s) from {name}', { n: fresh.length, name: peer.name || pairId }); // 本文は載せない
         if (tmux) await tmuxNotify(tmux, notice, submit).catch((e) => out(tf('notify failed: {msg}', { msg: e.message })));
         else if (flags.notify === 'osa') {
-          // 失敗を握り潰さない（通知許可が無い環境で"黙って届かない"のを防ぐ＝北原さん指摘）
+          // 失敗を握り潰さない（通知許可が無い環境で"黙って届かない"のを防ぐ＝Y.K.指摘）
           await osaNotify(short).catch((e) => out(tf('macOS notification failed: {msg} (allow Script Editor/osascript in System Settings > Notifications)', { msg: e.message })));
         } else out(notice);
         // 追加の通知フック（~/.bump/notify.json）。Chatwork＝「誰から何件」だけ飛ばす。
@@ -423,7 +423,7 @@ async function cmdLog(pairId, flags) {
     return;
   }
   // 受領・プロフィール等の制御レターは印を付けて区別する。付けないと「送った覚えのない sent」
-  // に見えて、自分の履歴を疑うことになる（北原さん報告 2026-08-04）。--plain で従来表示。
+  // に見えて、自分の履歴を疑うことになる（Y.K.報告 2026-08-04）。--plain で従来表示。
   const ctl = await controlMessageIds(pairId);
   for (const e of entries) {
     const mark = (!flags.plain && e.message_id && ctl.has(e.message_id)) ? t(' (control)') : '';

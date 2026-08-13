@@ -17,7 +17,7 @@ ngrok http 8795
 ```
 この公開URL＝`MM_RELAY_URL`。中継は暗号文しか見ないので、配布者のMacが中継でも中身は安全。
 
-## 1. 相手側の用意（杉田/北原/加賀爪さん・各自1回）
+## 1. 相手側の用意（K.S./Y.K./K.K.・各自1回）
 前提: Node 20+、git。
 ```sh
 git clone <bumpのリポ> ~/bump && cd ~/bump && npm install

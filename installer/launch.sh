@@ -64,7 +64,7 @@ else echo "claude not found: MCP登録は後で"; fi
 # 生きていても止めて立て直す＝アプリをダブルクリックするだけで更新が反映される（更新手順が無い）。
 # 応答しない残骸の片付けも同じ操作で済む（自動復旧）。
 alive_http() { curl -s -o /dev/null --max-time 3 "http://localhost:$PORT/api/state"; }
-# launchd(KeepAlive)で自分のbumpを管理している人がいる（北原さん 2026-08-04）。
+# launchd(KeepAlive)で自分のbumpを管理している人がいる（Y.K. 2026-08-04）。
 # その場合 pkill してもlaunchdが立て直し、この後のnohupと二重に走って通知が二重に鳴る。
 # 見つけたら先にlaunchd側を止める（無ければ何もしない）。
 # 検証ポート(MM_PORT指定)では触らない＝配る側のMacで本番のlaunchdを巻き込まないため。

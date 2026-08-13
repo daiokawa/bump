@@ -2,13 +2,13 @@
 # 相手ごとの「専用パッケージ」を1つ作る。
 #   - relay URL（＝配布者=あなたのtailscale受信箱の住所）を焼き込む → テスターは貼らずに即つながる
 #   - 宛先ラベルを刻む（recipient.txt）＝系統の種（誰に配ったか）
-# 使い方: bash installer/make-package.sh "加賀爪" [relayURL]
+# 使い方: bash installer/make-package.sh "K.K." [relayURL]
 #   relayURL 省略時は tailscale の自分のIPから自動生成（http://<ip>:8791）
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
-LABEL="${1:?宛先名を指定してください（例: 加賀爪）}"
+LABEL="${1:?宛先名を指定してください（例: K.K.）}"
 TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"
 # 既定relayはローカルファイル（gitに入れない＝リポジトリ公開時にURLを晒さない）
 RELAY_URL="${2:-$(cat installer/relay-url.local 2>/dev/null || echo "http://${TS_IP:-127.0.0.1}:8791")}"

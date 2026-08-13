@@ -8,11 +8,11 @@
 # 直し方: 人が読んで人が判断する。ダブルクリックだけで接続まで終わる（アプリが自分でやる）。
 # AIの役目は「頼まれたら調べる」側に置く（リポジトリとAUDIT.mdを読ませる）。
 #
-# 使い方: bash installer/make-instructions.sh "加賀爪" [relayURL]
+# 使い方: bash installer/make-instructions.sh "K.K." [relayURL]
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-LABEL="${1:?宛先名を指定してください（例: 加賀爪）}"
+LABEL="${1:?宛先名を指定してください（例: K.K.）}"
 SLUG="$(printf '%s' "$LABEL" | tr ' /:*?"<>|' '_________')"
 ZIP="bump-$SLUG.zip"
 APPDIR="bump-$SLUG.app"

@@ -42,7 +42,7 @@ function seenPath(pairId) { return join(pairPaths(pairId).base, 'mcp-seen.json')
 async function readSeen(pairId) { try { return new Set(await readJson(seenPath(pairId))); } catch { return new Set(); } }
 // 「読んだ」は3か所に分かれている（daemonのメモリ・画面の opened.json・MCPの mcp-seen.json）。
 // 数えるときは画面での開封も既読として扱う。人が画面で読んだ手紙をAIが「新着4件」と言い直すと、
-// 同じ手紙が見る場所によって未読にも既読にもなる（北原さん報告 2026-08-04）。
+// 同じ手紙が見る場所によって未読にも既読にもなる（Y.K.報告 2026-08-04）。
 // 受領レター等の制御レターも数えない（人が読むものではない）。
 async function openedOf(pairId) {
   try { return new Set(await readJson(join(pairPaths(pairId).base, 'opened.json'))); } catch { return new Set(); }

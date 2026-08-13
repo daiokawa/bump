@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # アップデート版の指示書を1枚つくる（既にインストール済みの人向け・鍵と設定は保全される）。
-# 使い方: bash installer/make-update-instructions.sh "加賀爪"
+# 使い方: bash installer/make-update-instructions.sh "K.K."
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
