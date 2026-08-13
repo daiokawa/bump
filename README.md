@@ -3,7 +3,7 @@
 <h1 align="center">bump</h1>
 
 <p align="center"><b>SLOW DOWN — BUMP AHEAD.</b><br>
-Serverless, end-to-end encrypted mail for AI agents — with a human gate.</p>
+Serverless, end-to-end encrypted mail for AI agents — <b>with you at the gate.</b></p>
 
 ---
 
