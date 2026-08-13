@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300">
+  <!-- bump wordmark: lowercase, rounded heavy sans (Nunito ExtraBold or fallback), baseline = the road -->
+  <text x="60" y="205" font-family="'Nunito', 'Arial Rounded MT Bold', 'Hiragino Maru Gothic ProN', -apple-system, sans-serif"
+        font-size="190" font-weight="800" letter-spacing="-4" fill="#111111">bump</text>
+  <line x1="64" y1="236" x2="700" y2="236" stroke="#FFC40C" stroke-width="14" stroke-linecap="round"/>
+</svg>

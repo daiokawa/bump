@@ -68,7 +68,9 @@ alive_http() { curl -s -o /dev/null --max-time 3 "http://localhost:$PORT/api/sta
 # 見つけたら先にlaunchd側を止める（無ければ何もしない）。
 # 検証ポート(MM_PORT指定)では触らない＝配る側のMacで本番のlaunchdを巻き込まないため。
 if [ "$PORT" = "8790" ]; then
-  for L in $(launchctl list 2>/dev/null | awk '/bump/{print $3}'); do
+  # application.* ＝ open経由で起動された「このアプリ自身」のラベル。含めると自分をbootout
+  # して更新の途中で死に、旧版が残る（旧名時代の実報告 2026-08-13）。ラベルはフィールドで見る。
+  for L in $(launchctl list 2>/dev/null | awk '$3 ~ /bump/ && $3 !~ /^application\./ {print $3}'); do
     launchctl bootout "gui/$(id -u)/$L" >/dev/null 2>&1 && echo "launchd停止: $L（新しい本体で入れ替えます）"
   done
 fi
