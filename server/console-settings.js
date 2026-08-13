@@ -6,7 +6,7 @@ async function renderMe(){
   let p={};try{p=await (await fetch('/api/profile')).json();}catch{}
   const bn=$('meBn');if(p.banner){$('meBnImg').src=p.banner;bn.classList.add('has');}else bn.classList.remove('has');
   const av=$('meAv');if(p.avatar){$('meAvImg').src=p.avatar;av.classList.add('has');}else av.classList.remove('has');
-  const nm=(p.name||'').trim();$('meName').textContent=nm||t('Profile not set');$('meAvPh').textContent=(nm||t('?')).slice(0,2);
+  const nm=(p.name||'').trim();$('meName').textContent=nm||t('Profile not set');if(nm){$('meAvPh').textContent=nm.slice(0,2);}else{const a=$('meAvPh');a.style.display='flex';a.style.alignItems='center';a.style.justifyContent='center';a.innerHTML='<svg viewBox="0 0 24 24" width="62%" height="62%" fill="rgba(255,255,255,.9)"><circle cx="12" cy="8.2" r="4.2"/><path d="M12 13.6c-4.6 0-8 2.5-8 5.9V21h16v-1.5c0-3.4-3.4-5.9-8-5.9z"/></svg>';}
 }
 function dz(dropId,fileId,clearId,tw,th,set){
   $(dropId).onclick=(e)=>{if(e.target.id===clearId)return;$(fileId).click();};

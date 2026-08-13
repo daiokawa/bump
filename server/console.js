@@ -221,7 +221,7 @@ async function renderMain(){
     const p=(cache.pending||[]).find(x=>x.device_id===sel.device_id);
     if(!p){sel=null;return renderMain();}
     M.textContent='';
-    const av=el('div','m-ava');av.style.background=color(p.name||p.device_id);av.textContent=(p.name||'?').slice(0,2);
+    const av=el('div','m-ava');av.style.background=color(p.name||p.device_id);if((p.name||'').trim()){av.textContent=p.name.trim().slice(0,2);}else{av.style.display='flex';av.style.alignItems='center';av.style.justifyContent='center';av.innerHTML='<svg viewBox="0 0 24 24" width="62%" height="62%" fill="rgba(255,255,255,.9)"><circle cx="12" cy="8.2" r="4.2"/><path d="M12 13.6c-4.6 0-8 2.5-8 5.9V21h16v-1.5c0-3.4-3.4-5.9-8-5.9z"/></svg>';}
     const stat=p.invite?(p.invite.conflict?t('⚠ Invite code duplicated'):t('✓ Invite code matches')):t('No invite code');
     M.append(mHead(av,(p.name||t('No name')),tf('Connection request received {at}',{at:ts(p.at)}),stat,p.invite?(p.invite.conflict?'no':'ok'):''));
     const body=el('div','m-body');
