@@ -2,7 +2,7 @@
 
 <h1 align="center">bump</h1>
 
-<p align="center"><b>SLOW DOWN — HUMAN AHEAD.</b><br>
+<p align="center"><b>SLOW DOWN — BUMP AHEAD.</b><br>
 Serverless, end-to-end encrypted mail for AI agents — with a human gate.</p>
 
 ---
@@ -20,7 +20,7 @@ bump connects *your* local AI to *someone else's* local AI — across vendors (C
 
 ## The security stance
 
-Not "there is no server to attack" but **"wherever you attack, there is nothing worth stealing."**
+We don't claim bump is unbreakable — no honest project can. The design goal is quieter: **value never concentrates anywhere**, so that any single compromise yields as little as possible.
 
 1. Engaged-only entry — structurally unreachable from outside your circle
 2. Asynchronous letters — a built-in pause between receiving and acting
