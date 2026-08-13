@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>bump — つながる</title>
+<title data-ja="bump — つながる">bump — connect</title>
 <style>
   :root{--bg:#f4f7fa;--panel:#fff;--ink:#16202b;--muted:#6b7a8a;--line:#e2e8ee;--blue:#1f6feb;--green:#1f9d63;--red:#d1495b}
   *{box-sizing:border-box}
@@ -24,35 +24,59 @@
 </style>
 </head>
 <body>
-  <div class="box" id="box"><div class="sub">つないでいます…</div></div>
+  <div class="box" id="box"><div class="sub" data-ja="つないでいます…">Connecting…</div></div>
 <script>
+// English is the source; ja-locale browsers get the Japanese from the dict below.
+const JA=/^ja/i.test(navigator.language||'');
+const JADICT={
+  'Could not connect':'つながれませんでした',
+  'Open bump':'bumpを開く',
+  'Invalid invite link.':'招待リンクが不正です。',
+  'Could not read the invite link.':'招待リンクを読めませんでした。',
+  'This invite link has expired (5 minutes). Ask them to send a new one.':'この招待リンクは期限切れです（5分）。相手に新しいリンクを送ってもらってください。',
+  'Could not verify the invite link.':'招待リンクの検証に失敗しました。',
+  'Connected':'つながりました',
+  'They are in your list as engaged. You can now exchange letters, asynchronously.':'相手をEngagedに追加しました。これで非同期にやり取りできます。',
+  'engaged (unverified)':'engaged（未検証）',
+  'To raise this to "verified" — no one in the middle — hold up a QR face to face, or confirm an invite code once (deep in settings).':'中間者ゼロの「検証済み」に上げるには、対面でQRをかざすか、合言葉を一度だけ確認します（設定の奥）。'
+};
+const t=s=>JA?(JADICT[s]||s):s;
 const el=(t,c)=>{const n=document.createElement(t);if(c)n.className=c;return n;};
 function show(nodes){const b=document.getElementById('box');b.textContent='';nodes.forEach(n=>b.append(n));}
 function fail(msg){
-  const h=el('h1');h.textContent='つながれませんでした';const s=el('div','sub err');s.textContent=msg;
-  const btn=el('button');btn.textContent='bumpを開く';btn.onclick=()=>location.href='/';
+  const h=el('h1');h.textContent=t('Could not connect');const s=el('div','sub err');s.textContent=msg;
+  const btn=el('button');btn.textContent=t('Open bump');btn.onclick=()=>location.href='/';
   show([h,s,btn]);
 }
 (async()=>{
   const m=location.hash.match(/i=([A-Za-z0-9\-_]+)/);
-  if(!m)return fail('招待リンクが不正です。');
+  if(!m)return fail(t('Invalid invite link.'));
   let bundle;
-  try{ bundle=JSON.parse(atob(m[1].replace(/-/g,'+').replace(/_/g,'/'))); }catch(e){ return fail('招待リンクを読めませんでした。'); }
+  try{ bundle=JSON.parse(atob(m[1].replace(/-/g,'+').replace(/_/g,'/'))); }catch(e){ return fail(t('Could not read the invite link.')); }
   // fragmentは履歴・スクショに残り得るので即消す（codexレビュー）
   try{ history.replaceState(null,'',location.pathname); }catch(e){}
   const r=await (await fetch('/api/scan',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({bundle,via:'link'})})).json();
-  if(r.error){ return fail(r.error==='expired'?'この招待リンクは期限切れです（5分）。相手に新しいリンクを送ってもらってください。':'招待リンクの検証に失敗しました。'); }
+  if(r.error){ return fail(r.error==='expired'?t('This invite link has expired (5 minutes). Ask them to send a new one.'):t('Could not verify the invite link.')); }
   const dev=(bundle.device_id||'').slice(0,2).toUpperCase();
-  const ava=el('div','ava');ava.textContent=dev||'？';
-  const h=el('h1');h.textContent='つながりました';
-  const s=el('div','sub');s.textContent='相手をEngagedに追加しました。これで非同期にやり取りできます。';
-  const tag=el('div','tag eng');tag.textContent='engaged（未検証）';
+  const ava=el('div','ava');ava.textContent=dev||'?';
+  const h=el('h1');h.textContent=t('Connected');
+  const s=el('div','sub');s.textContent=t('They are in your list as engaged. You can now exchange letters, asynchronously.');
+  const tag=el('div','tag eng');tag.textContent=t('engaged (unverified)');
   const note=el('div','sub');note.style.marginTop='12px';
-  note.textContent='中間者ゼロの「検証済み」に上げるには、対面でQRをかざすか、合言葉を一度だけ確認します（設定の奥）。';
-  const btn=el('button');btn.textContent='bumpを開く';btn.onclick=()=>location.href='/';
+  note.textContent=t('To raise this to "verified" — no one in the middle — hold up a QR face to face, or confirm an invite code once (deep in settings).');
+  const btn=el('button');btn.textContent=t('Open bump');btn.onclick=()=>location.href='/';
   show([ava,h,s,tag,note,btn]);
 })();
+</script>
+<script>
+// Static text: ja-locale browsers swap back to the data-ja Japanese.
+if(/^ja/i.test(navigator.language||'')){
+  document.querySelectorAll('[data-ja]').forEach(e=>{e.textContent=e.dataset.ja;});
+  document.querySelectorAll('[data-ja-placeholder]').forEach(e=>{e.placeholder=e.dataset.jaPlaceholder;});
+  document.querySelectorAll('[data-ja-title]').forEach(e=>{e.title=e.dataset.jaTitle;});
+  document.documentElement.lang='ja';
+}
 </script>
 </body>
 </html>

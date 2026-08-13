@@ -14,6 +14,7 @@ import { beat, reachOf } from '../lib/presence.js';
 import { screen } from '../lib/guard.js';
 import { warn } from '../lib/log.js';
 import { hasRoom, humanBytes, freeBytes } from '../lib/disk.js';
+import { t, tf } from '../lib/i18n.js';
 
 const RELAY = process.env.MM_RELAY || '/tmp/mm-demo/relay';
 const now = () => new Date().toISOString();
@@ -42,7 +43,7 @@ async function screenPair(pairId, peerDeviceId) {
     }).catch((e) => {
       // 縁が消えた後の書き込み失敗(ENOENT)は正常なので警告に出さない
       // （正常なノイズで本当の異常が埋もれるのを防ぐ）。それ以外は記録する。
-      if (e && e.code !== 'ENOENT') warn(`点検(${pairId})`, e);
+      if (e && e.code !== 'ENOENT') warn(tf('screening ({pair})', { pair: pairId }), e);
     }).finally(() => screenInFlight.delete(key)); // 失敗してもサーバは落とさない
   }
 }
@@ -87,7 +88,7 @@ export function carryLocalPeer(peer, existing) {
 }
 // 表示名。alias(手元の呼び名)があれば最優先でそのまま。無ければ 名前/縁名 に、
 // 人間なら「さん」を付ける。AI/タブ(peer.ai=true 例:codex)には付けない。
-export function contactLabel(pairId, name, alias, ai) { if (alias) return alias; const base = name || pairId; return ai ? base : base + 'さん'; }
+export function contactLabel(pairId, name, alias, ai) { if (alias) return alias; const base = name || pairId; return ai ? base : tf('{name}', { name: base }); }
 
 // --- メッセージの読み出し ---------------------------------------------------
 // 自分のエンドが持つ履歴（自分発＋受信済）。分散＝各エンドが自分の分だけ持つ。
@@ -109,7 +110,7 @@ async function pullAll() {
   if (Date.now() - pulledAt < PULL_INTERVAL_MS) return null;  // 直後の連打は素通り
   pullPromise = (async () => {
     // 空きが無いときは取り込まない。relayに残るので手紙は失われず、空けてから受け取れる。
-    if (!(await hasRoom())) { warn('ディスク', new Error(`空きが少ないため受信を保留しました（残り ${humanBytes(await freeBytes())}）`)); return; }
+    if (!(await hasRoom())) { warn(t('disk'), new Error(tf('receiving paused: low disk space ({free} left)', { free: humanBytes(await freeBytes()) }))); return; }
     const me = await identity();
     const peersOf = {}, peers = {};
     for (const id of await listPairs()) {
@@ -120,9 +121,9 @@ async function pullAll() {
       // 封筒が置かれた縁だけ復号・検証する（届かないのに画面が正常に見える、を防ぐ）
       for (const id of Object.keys(placed || {})) {
         try { await receiveInbox({ identity: me, peer: peers[id], pairId: id, now }); }
-        catch (e) { warn(`受信(${id})`, e); }
+        catch (e) { warn(tf('receive ({pair})', { pair: id }), e); }
       }
-    } catch (e) { warn('受信', e); }
+    } catch (e) { warn(t('receive'), e); }
     pulledAt = Date.now();
   })().finally(() => { pullPromise = null; });
   return pullPromise;
@@ -213,7 +214,7 @@ export async function letterJson(pairId, id) {
       if (fresh && peer && m.from === peer.device_id && receiptsEnabled(peer)) {
         try { const me = await identity(); await sendReceipt({ identity: me, peer, pairId, re: id, status: 'read', now });
           await pushToRelay({ pairId, relayDir: RELAY, peerDeviceId: peer.device_id }); }
-        catch (e) { warn(`既読の通知(${pairId})`, e); }
+        catch (e) { warn(tf('read receipt ({pair})', { pair: pairId }), e); }
       }
       return { pair: pairId, id, at: m.created_at, body: m.body, label, suspicious: sc[id] || null,
         channels, inquiries: inq[id] || [] }; }

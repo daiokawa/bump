@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -194,73 +194,74 @@
   <div class="side">
     <div class="side-head">
       <div class="brandrow">
-        <div class="brand" id="brand" title="トップへ"><b>bu<i>mp</i></b></div>
-        <button class="warnbtn" id="warnBtn" style="display:none" title="うまくいかなかったこと"></button><button class="howto-mini" id="howto">つかいかた</button>
+        <div class="brand" id="brand" title="Home" data-ja-title="トップへ"><b>bu<i>mp</i></b></div>
+        <button class="warnbtn" id="warnBtn" style="display:none" title="What went wrong" data-ja-title="うまくいかなかったこと"></button><button class="howto-mini" id="howto" data-ja="つかいかた">How it works</button>
       </div>
-      <div class="meCard" id="settings" title="プロフィールを編集（設定）">
+      <div class="meCard" id="settings" title="Edit profile (settings)" data-ja-title="プロフィールを編集（設定）">
         <div class="meBanner" id="meBn"><img id="meBnImg" alt=""></div>
         <div class="meRow"><div class="meAva" id="meAv"><img id="meAvImg" alt=""><span id="meAvPh"></span></div><div class="meName" id="meName"></div></div>
       </div>
     </div>
     <div class="seg" id="nav">
-      <div class="t active" data-s="inbox">着信<span class="dot" id="inboxBadge" style="display:none">0</span></div>
-      <div class="t" data-s="pairs">連絡先</div>
-      <div class="t" data-s="sent">履歴</div>
+      <div class="t active" data-s="inbox"><span data-ja="着信">Inbox</span><span class="dot" id="inboxBadge" style="display:none">0</span></div>
+      <div class="t" data-s="pairs" data-ja="連絡先">Contacts</div>
+      <div class="t" data-s="sent" data-ja="履歴">Sent</div>
     </div>
     <div id="pendingBox" class="pendbox" style="display:none"></div>
     <div id="pkgBox" class="pkgbox" style="display:none"></div>
     <div class="list" id="list"></div>
-    <div class="side-foot"><button class="tbtn addfull" id="add">＋ ユーザー追加</button></div>
+    <div class="side-foot"><button class="tbtn addfull" id="add" data-ja="＋ ユーザー追加">＋ Add contact</button></div>
   </div>
   <div class="main" id="main"></div>
 
   <div class="scrim" id="tabScrim"><div class="dialog">
-    <h3 class="dh" id="tabHd">どのClaudeに読ませますか？</h3><div class="dsub" id="tabSub">点検済み・外部データ枠で、選んだタブに流し込みます。</div>
+    <h3 class="dh" id="tabHd" data-ja="どのClaudeに読ませますか？">Which Claude should read this?</h3><div class="dsub" id="tabSub" data-ja="点検済み・外部データ枠で、選んだタブに流し込みます。">Screened, then fed to the tab you pick as external data.</div>
     <div id="tabList"></div>
   </div></div>
 
   <div class="scrim" id="setScrim"><div class="dialog">
-    <h3 class="dh">プロフィール</h3><div class="dsub">名前・アイコンは、つながる相手に伝わります（署名つき）。</div>
-    <div class="ilabel">名前</div><input class="setin" id="pName" placeholder="例: 大川弘一">
-    <div class="ilabel" style="margin-top:13px">あなたの device 番号（鍵の指紋）</div>
-    <div class="exp" style="margin:0 0 8px">相手が承認の前に本人確認で聞いてくることがあります。そのときは電話やLINEでこの番号を読み上げてください。秘密ではないので伝えて構いません。</div>
+    <h3 class="dh" data-ja="プロフィール">Profile</h3><div class="dsub" data-ja="名前・アイコンは、つながる相手に伝わります（署名つき）。">Your name and icon are shared, signed, with the people you connect to.</div>
+    <div class="ilabel" data-ja="名前">Name</div><input class="setin" id="pName" placeholder="e.g. Koichi Okawa" data-ja-placeholder="例: 大川弘一">
+    <div class="ilabel" style="margin-top:13px" data-ja="あなたの device 番号（鍵の指紋）">Your device number (key fingerprint)</div>
+    <div class="exp" style="margin:0 0 8px" data-ja="相手が承認の前に本人確認で聞いてくることがあります。そのときは電話やLINEでこの番号を読み上げてください。秘密ではないので伝えて構いません。">Before approving you, the other person may ask for this number to confirm it is you. Read it out over the phone or a chat app. It is not a secret.</div>
     <div class="fp" id="meFp"></div>
-    <div class="ilabel" style="margin-top:13px">プロフィール画像（バナー＋アイコン）</div>
+    <div class="ilabel" style="margin-top:13px" data-ja="プロフィール画像（バナー＋アイコン）">Profile images (banner + icon)</div>
     <div class="xprof">
-      <div id="bnDrop" class="bndrop"><img id="bnImg" alt=""><div id="bnPh" class="bnph">タイトルバナー（横長）をドロップ／クリック</div><button type="button" id="bnClear" class="imgclear">×</button></div>
-      <div id="avDrop" class="avsq"><img id="avImg" alt=""><div id="avPh" class="avph2">アイコン</div><button type="button" id="avClear" class="imgclear">×</button></div>
+      <div id="bnDrop" class="bndrop"><img id="bnImg" alt=""><div id="bnPh" class="bnph" data-ja="タイトルバナー（横長）をドロップ／クリック">Drop or click to set a banner (wide)</div><button type="button" id="bnClear" class="imgclear">×</button></div>
+      <div id="avDrop" class="avsq"><img id="avImg" alt=""><div id="avPh" class="avph2" data-ja="アイコン">Icon</div><button type="button" id="avClear" class="imgclear">×</button></div>
     </div>
     <input type="file" id="bnFile" accept="image/*" style="display:none">
     <input type="file" id="pImgFile" accept="image/*" style="display:none">
-    <div class="exp">バナーは横長、アイコンは正方形。ドロップで差し替え、×で削除。縮小してローカル保存＋署名つきで相手に伝わります。</div>
-    <div class="ilabel" style="margin-top:13px">リンク（1行に1つ・任意）</div>
+    <div class="exp" data-ja="バナーは横長、アイコンは正方形。ドロップで差し替え、×で削除。縮小してローカル保存＋署名つきで相手に伝わります。">Banner is wide, icon is square. Drop to replace, × to remove. Shrunk, stored locally, and shared with your contacts, signed.</div>
+    <div class="ilabel" style="margin-top:13px" data-ja="リンク（1行に1つ・任意）">Links (one per line, optional)</div>
     <textarea class="setin" id="pLinks" rows="3" placeholder="https://…" style="resize:vertical"></textarea>
-    <div class="ilabel" style="margin-top:15px">連絡経路（本人確認で相手が開くツール）</div>
-    <div class="exp" style="margin:0 0 9px">相手があなたを別経路で本人確認するとき、ここで選んだツールが相手の画面で開きます。使うものにチェックを入れて、リンク／IDを入れてください。</div>
+    <div class="ilabel" style="margin-top:15px" data-ja="連絡経路（本人確認で相手が開くツール）">Contact channels (what the other person opens to verify you)</div>
+    <div class="exp" style="margin:0 0 9px" data-ja="相手があなたを別経路で本人確認するとき、ここで選んだツールが相手の画面で開きます。使うものにチェックを入れて、リンク／IDを入れてください。">When someone verifies you over another channel, the tools you pick here open on their screen. Check the ones you use and add a link or ID.</div>
     <div id="chList"></div>
-    <div class="ilabel" style="margin-top:15px">新着通知をChatworkにも送る（任意）</div>
-    <div class="exp" style="margin:0 0 9px">新着があったとき「誰から何件」だけをChatworkに送ります（本文は送りません）。トークンはこのMacにだけ保存され、相手には伝わりません。マイチャット宛にすればスマホにプッシュが届きます。</div>
-    <input class="setin" id="cwToken" placeholder="Chatwork APIトークン" autocomplete="off">
-    <input class="setin" id="cwRoom" placeholder="ルームID（マイチャットの数字）" style="margin-top:8px">
-    <input class="setin" id="cwAccount" placeholder="アカウントID（任意・入れるとTo付きでスマホ通知が届く）" style="margin-top:8px">
+    <div class="ilabel" style="margin-top:15px" data-ja="新着通知をChatworkにも送る（任意）">Also send new-arrival alerts to Chatwork (optional)</div>
+    <div class="exp" style="margin:0 0 9px" data-ja="新着があったとき「誰から何件」だけをChatworkに送ります（本文は送りません）。トークンはこのMacにだけ保存され、相手には伝わりません。マイチャット宛にすればスマホにプッシュが届きます。">When something arrives, only "who and how many" goes to Chatwork — never the letter itself. The token stays on this Mac and is never shared. Point it at My Chat and your phone gets a push.</div>
+    <input class="setin" id="cwToken" placeholder="Chatwork API token" data-ja-placeholder="Chatwork APIトークン" autocomplete="off">
+    <input class="setin" id="cwRoom" placeholder="Room ID (the My Chat number)" data-ja-placeholder="ルームID（マイチャットの数字）" style="margin-top:8px">
+    <input class="setin" id="cwAccount" placeholder="Account ID (optional; adds To so your phone gets pushed)" data-ja-placeholder="アカウントID（任意・入れるとTo付きでスマホ通知が届く）" style="margin-top:8px">
     <div id="blockWrap" style="display:none">
-      <div class="ilabel" style="margin-top:15px">ブロック中の相手</div>
-      <div class="exp" style="margin:0 0 9px">この相手からの接続リクエストは届いた瞬間に捨てられます。</div>
+      <div class="ilabel" style="margin-top:15px" data-ja="ブロック中の相手">Blocked contacts</div>
+      <div class="exp" style="margin:0 0 9px" data-ja="この相手からの接続リクエストは届いた瞬間に捨てられます。">Connection requests from them are dropped the moment they arrive.</div>
       <div id="blockList"></div>
     </div>
-    <button class="btn apply" id="pSave" style="width:100%;margin-top:15px;min-width:0">保存</button>
+    <button class="btn apply" id="pSave" style="width:100%;margin-top:15px;min-width:0" data-ja="保存">Save</button>
   </div></div>
 
   <div class="scrim" id="connScrim"><div class="dialog">
-    <h3 class="dh">つながる</h3><div class="dsub">離れた相手には招待リンク、目の前ならQR。</div>
-    <div class="ilabel">招待リンク（LINE等で送る）</div>
-    <div class="irow"><input id="inviteLink" readonly><button class="btn apply" style="min-width:0;padding:11px 15px" id="copyBtn">コピー</button></div>
+    <h3 class="dh" data-ja="つながる">Connect</h3><div class="dsub" data-ja="離れた相手には招待リンク、目の前ならQR。">Invite link for someone far away. QR for someone in front of you.</div>
+    <div class="ilabel" data-ja="招待リンク（LINE等で送る）">Invite link (send it over chat)</div>
+    <div class="irow"><input id="inviteLink" readonly><button class="btn apply" style="min-width:0;padding:11px 15px" id="copyBtn" data-ja="コピー">Copy</button></div>
     <div class="exp" id="inviteExp"></div>
-    <button class="segbtn" id="toggleQR">目の前の相手と QR でつなぐ ▾</button>
+    <button class="segbtn" id="toggleQR" data-ja="目の前の相手と QR でつなぐ ▾">Connect by QR, face to face ▾</button>
     <div id="qrSection" style="display:none;text-align:center"><div class="qrwrap"><img id="qrImg" alt="QR"></div><div class="exp" id="qrExp"></div></div>
-    <button class="link" id="pasteLink">受け取ったリンク／QR内容を貼り付ける</button>
+    <button class="link" id="pasteLink" data-ja="受け取ったリンク／QR内容を貼り付ける">Paste a link or QR contents you received</button>
   </div></div>
 
+<script src="/console-i18n.js?v=1"></script>
 <script src="/console-base.js?v=20260728a"></script>
 <script src="/console-modals.js?v=20260728a"></script>
 <script src="/console-settings.js?v=20260728a"></script>
