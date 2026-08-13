@@ -26,8 +26,9 @@ ask(){ [ -n "$NONI" ] && { echo ""; return; }; osascript -e "text returned of (d
 [ -x "$NODE" ] || { alert "Node.js が見つかりません。claude cli を入れていれば Node もあります（要 Node 20+）。"; exit 1; }
 
 # 1) 導入（依存同梱ごとコピー・安定パスへ）
+case "$DEST" in "$HOME"/.*-app) rm -rf "$DEST";; esac   # openrsyncのdelete-excluded不動作対策（全入れ替え）
 mkdir -p "$DEST" "$RELAY"
-rsync -a --delete-excluded --exclude .git --exclude dist --exclude '*.log' --exclude .playwright-mcp "$HERE/" "$DEST/"
+rsync -a --exclude .git --exclude dist --exclude '*.log' --exclude .playwright-mcp --exclude .mcp.json --exclude .DS_Store --exclude '._*' "$HERE/" "$DEST/"
 cd "$DEST" || exit 1
 
 # 2) 自分のエンド（鍵）を生成（冪等）
@@ -71,7 +72,7 @@ if [ "$PORT" = "8790" ]; then
   # application.* ＝ open経由で起動された「このアプリ自身」のラベル。含めると自分をbootout
   # して更新の途中で死に、旧版が残る（旧名時代の実報告 2026-08-13）。ラベルはフィールドで見る。
   for L in $(launchctl list 2>/dev/null | awk '$3 ~ /bump/ && $3 !~ /^application\./ {print $3}'); do
-    launchctl bootout "gui/$(id -u)/$L" >/dev/null 2>&1 && echo "launchd停止: $L（新しい本体で入れ替えます）"
+    launchctl bootout "gui/$(id -u)/${L}" >/dev/null 2>&1 && echo "launchd stop: ${L} (replacing with the new build)"
   done
 fi
 pkill -f "server/web.js $PORT" >/dev/null 2>&1
