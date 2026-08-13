@@ -1,6 +1,6 @@
 # 疑うための道具
 
-middlemanが「何を触り、何を外に出し、何を実行するか」を、**主張ではなく自分の目で確かめる**ための手順です。
+bumpが「何を触り、何を外に出し、何を実行するか」を、**主張ではなく自分の目で確かめる**ための手順です。
 「安全です」と言われても信じる理由はないので、確かめる手段を置いておきます。所要5分。
 
 コード全体は約3,000行（うち暗号は `lib/crypto.js` の217行だけ）。全部読めます。
@@ -19,7 +19,7 @@ grep -rn "fetch(" lib server bin | grep -v node_modules
 relayのURLはコードに埋め込まれていません。あなたが置いた値だけを使います：
 
 ```sh
-cat ~/.middleman-hub/relay-url      # 接続先はこの1行だけ
+cat ~/.bump-hub/relay-url      # 接続先はこの1行だけ
 grep -n "relayUrl\|MM_RELAY_URL" lib/relay.js
 ```
 
@@ -29,8 +29,8 @@ grep -n "relayUrl\|MM_RELAY_URL" lib/relay.js
 
 ```sh
 # 送信待ちの封筒（配達済みは .pushed、受信済みは .done が付く）
-ls ~/.middleman/pairs/*/outbox/ ~/.middleman/pairs/*/inbox/ 2>/dev/null | head
-cat ~/.middleman/pairs/*/outbox/*.env.json* 2>/dev/null | head -12
+ls ~/.bump/pairs/*/outbox/ ~/.bump/pairs/*/inbox/ 2>/dev/null | head
+cat ~/.bump/pairs/*/outbox/*.env.json* 2>/dev/null | head -12
 ```
 
 | 封筒の項目 | 中身 | relayに見えるか |
@@ -72,9 +72,9 @@ grep -rn "writeFile\|mkdir\|appendFile\|rm(" lib server bin | grep -v node_modul
 
 | 場所 | 中身 |
 |---|---|
-| `~/.middleman-app` | コード本体（clone/展開先） |
-| `~/.middleman` | あなたの鍵・手紙・設定（`root()` が返す先。`MIDDLEMAN_HOME` で変更可） |
-| `~/.middleman-hub` | 接続先URLの控え |
+| `~/.bump-app` | コード本体（clone/展開先） |
+| `~/.bump` | あなたの鍵・手紙・設定（`root()` が返す先。`BUMP_HOME` で変更可） |
+| `~/.bump-hub` | 接続先URLの控え |
 
 **それ以外には書きません。** シェルの起動ファイル（`.zshrc` 等）、既存アプリの設定、システム領域には一切触りません。確かめるなら：
 
@@ -109,7 +109,7 @@ seed（ソフト配布）も同じで、届いても**展開も実行もしま�
 既存の環境に一切触れずに動かせます。
 
 ```sh
-MIDDLEMAN_HOME=/tmp/mmtest node bin/middleman.js init      # 鍵も手紙も全部 /tmp/mmtest の中
+BUMP_HOME=/tmp/mmtest node bin/bump.js init      # 鍵も手紙も全部 /tmp/mmtest の中
 MM_SELF=/tmp/mmtest node server/web.js 8799                # 画面も別ポートで
 ```
 
@@ -122,8 +122,8 @@ MM_SELF=/tmp/mmtest node server/web.js 8799                # 画面も別ポー�
 lsof -nP -i -a -p $(pgrep -f 'server/web.js' | head -1)
 
 # ファイルの書き込み先をリアルタイムに（要sudo・macOS）
-sudo fs_usage -w -f filesystem $(pgrep -f 'server/web.js' | head -1) | grep -v ' \.middleman'
-# → ~/.middleman 以外への書き込みが流れないのが期待される結果
+sudo fs_usage -w -f filesystem $(pgrep -f 'server/web.js' | head -1) | grep -v ' \.bump'
+# → ~/.bump 以外への書き込みが流れないのが期待される結果
 ```
 
 ---

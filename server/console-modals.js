@@ -1,4 +1,4 @@
-// middleman 配線盤：モーダル/ダイアログ群（本文ヘッダ・相手設定・プロフィール・タブ選択・
+// bump 配線盤：モーダル/ダイアログ群（本文ヘッダ・相手設定・プロフィール・タブ選択・
 // 画像トリミング・断り・別経路照会）。console.html から分離した表示レイヤの一部。
 // 描画は textContent / DOM構築のみ（innerHTML禁止＝外部データをXSSベクタにしない）。
 
@@ -93,8 +93,8 @@ function openApprove(p,after){
     const cp=el('button','btn');cp.style.cssText='background:#eef2f6;color:#46586a;padding:9px 13px;font-size:12px;margin-top:11px;min-width:0';
     cp.textContent='確認をお願いする文をコピー';
     cp.onclick=async()=>{
-      const t='middleman の接続リクエストをありがとうございます。念のため確認させてください。\n'
-        +'そちらの device 番号（32桁）を教えていただけますか。手元のClaudeに「middleman の device 番号を教えて」と聞けば出ます。\n'
+      const t='bump の接続リクエストをありがとうございます。念のため確認させてください。\n'
+        +'そちらの device 番号（32桁）を教えていただけますか。手元のClaudeに「bump の device 番号を教えて」と聞けば出ます。\n'
         +'こちらに届いている番号: '+fpGroups(p.device_id);
       try{await navigator.clipboard.writeText(t);cp.textContent='✓ コピーしました';}catch{cp.textContent='コピーできませんでした';}};
     c.append(ex,cp);panel.append(c);

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- bump logo: road-sign diamond + single hump glyph -->
+  <g transform="rotate(45 256 256)">
+    <rect x="76" y="76" width="360" height="360" rx="44" fill="#FFC40C"/>
+    <rect x="100" y="100" width="312" height="312" rx="32" fill="none" stroke="#111111" stroke-width="18"/>
+  </g>
+  <path d="M132 322 H 196 C 226 322 224 258 256 258 C 288 258 286 322 316 322 H 380"
+        fill="none" stroke="#111111" stroke-width="30" stroke-linecap="round"/>
+</svg>

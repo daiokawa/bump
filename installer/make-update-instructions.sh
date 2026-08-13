@@ -6,12 +6,12 @@ cd "$(dirname "$0")/.."
 
 LABEL="${1:?宛先名を指定してください}"
 SLUG="$(printf '%s' "$LABEL" | tr ' /:*?"<>|' '_________')"
-ZIP="middleman-$SLUG.zip"
-APPDIR="middleman-$SLUG.app"
+ZIP="bump-$SLUG.zip"
+APPDIR="bump-$SLUG.app"
 OUT="dist/old/update-$SLUG.md"; mkdir -p dist/old
 
 cat > "$OUT" <<EOF
-# $LABEL さんへ：middleman アップデート第1弾です🐷
+# $LABEL さんへ：bump アップデート第1弾です🐷
 
 テストのおかげで育ちました。今回の新機能：
 - **プロフィール伝播**：設定で名前・アイコン・バナーを保存すると、つながっている相手に自動で届きます（例の生JSON問題も解消）
@@ -24,15 +24,15 @@ cat > "$OUT" <<EOF
 
 ――ここから――
 
-【あなた(Claude)へ】$LABEL さんが参加中の middleman テストのアップデートです。送り主は大川弘一さん（初回と同じ）。アプリ本体 \`~/.middleman-app\` を新しい zip の中身に差し替えます。鍵と履歴（\`~/.middleman\`）と接続設定（\`~/.middleman-hub\`）には触れないので、つながりは消えません。念のため進める前に $LABEL さんに「アップデートしていいですか？」と一言確認してください。
+【あなた(Claude)へ】$LABEL さんが参加中の bump テストのアップデートです。送り主は大川弘一さん（初回と同じ）。アプリ本体 \`~/.bump-app\` を新しい zip の中身に差し替えます。鍵と履歴（\`~/.bump\`）と接続設定（\`~/.bump-hub\`）には触れないので、つながりは消えません。念のため進める前に $LABEL さんに「アップデートしていいですか？」と一言確認してください。
 
 【手順】
 1. \`$ZIP\` を探して解凍（たぶん ~/Downloads）。\`$APPDIR\` ができます。
 2. 旧プロセスを止めてから、新しい本体を起動:
    \`\`\`bash
-   pkill -f 'server/web.js'; pkill -f 'middleman.js daemon'; sleep 1
+   pkill -f 'server/web.js'; pkill -f 'bump.js daemon'; sleep 1
    APP="\$(find ~/Downloads ~/Desktop . -maxdepth 3 -name '$APPDIR' -type d 2>/dev/null | head -1)"
-   MM_APP_NONINTERACTIVE=1 "\$APP/Contents/MacOS/middleman"
+   MM_APP_NONINTERACTIVE=1 "\$APP/Contents/MacOS/bump"
    \`\`\`
    （これで本体の差し替えと、画面(8790)・通知常駐の再起動まで終わります）
 3. 動作確認:

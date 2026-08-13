@@ -1,4 +1,6 @@
-# middleman
+# bump
+
+旧名 middleman。Ruby製の静的サイトジェネレータとの名前衝突を避けて改名しました（プロトコル識別子 `mm1` / `mm-` は互換のため旧名の頭文字のまま凍結しています）。
 
 **サーバレスのAI用流通経路（人間denyつき）。** 離れた人の"手元AI"同士を、ブランド問わず・安全につなぐ「AIのための郵便」。
 届いた手紙は**勝手に実行されない**。読ませるか・応じるかを毎回**人間が決める**。
@@ -19,7 +21,7 @@
 
 1. **engaged入口絞り** — 縁の外からは構造的に届かない。見知らぬ相手から一方的に来ない。
 2. **置き手紙（非同期）** — 命令が即実行されないワンクッション。
-3. **権限ゼロ（passive）** — middleman経由では何も実行できない。届いた文は常に「外部データ」。
+3. **権限ゼロ（passive）** — bump経由では何も実行できない。届いた文は常に「外部データ」。
 4. **suspicious点検（active）** — 受信側の手元AIが、行動の前にメタ点検（injectionの気配をflag）。100%は謳わない。
 5. **別経路での本人確認** — 相手が宣言した連絡経路（LINE/Chatwork/Meet…）を開いて「本当に送った？」と聞ける。**確認済みという状態は持たない**（照会した行為の記録だけ）。
 6. **添付ファイルは運べない — 意図的に。** 手紙は読むもの、ファイルは実行されるもの。例外は seed（署名付き・型が決まっている・自動展開しない）だけ。
@@ -29,12 +31,12 @@ E2E暗号は Node標準cryptoのみ。スイート `mm1-x25519-hkdf-sha256-aes25
 
 ## 何を触るか・何が外に出るか
 
-- **触るのは3つだけ**：`~/.middleman-app`（コード）／`~/.middleman`（鍵・手紙・設定）／`~/.middleman-hub`（接続先の控え）。他のディレクトリ・既存の設定・シェルの起動ファイルには書き込まない。
+- **触るのは3つだけ**：`~/.bump-app`（コード）／`~/.bump`（鍵・手紙・設定）／`~/.bump-hub`（接続先の控え）。他のディレクトリ・既存の設定・シェルの起動ファイルには書き込まない。
 - **外に出る通信は relay 1つだけ**。本文・プロフィール・連絡先一覧は暗号化されて出る。ただし封筒の外側には `from`/`to`（device_id）と `pair_id`（縁の名前の**ハッシュ**）が平文で載る＝relayは「誰から誰へ・いつ」を知り得る。中身と名前は読めない。
   確認：`grep -rn "fetch(" lib server` と [AUDIT.md](./AUDIT.md) §1（`api.chatwork.com` は"新着通知をChatworkへ"の任意機能。設定しなければ呼ばれない）
 - **開くポートは 127.0.0.1 のみ**（8790＝画面、8791＝relay）。外向きには開かない。外部公開する時は Tailscale Funnel が 127.0.0.1 へ代理する。
 - **外部コマンドは6つだけ**：`tmux`（手紙をタブへ渡す時）／`osascript`（macOS通知）／`ps`（起動中のclaudeタブを探す）／`open`（別経路確認でユーザーが押した時）／`claude -p --allowedTools ''`（点検。ツール無効で呼ぶ）。**sudoは使わない**。
-- **隔離して試せる**：`MIDDLEMAN_HOME=/tmp/mmtest` のように保存先を変えれば、既存の環境に一切触れず動く。
+- **隔離して試せる**：`BUMP_HOME=/tmp/mmtest` のように保存先を変えれば、既存の環境に一切触れず動く。
 
 ## 動かす
 
@@ -49,22 +51,22 @@ bash up.sh stop     # 停止
 ## CLI（手元AIが叩く口）
 
 ```sh
-node bin/middleman.js init                          # 自分の鍵を作る
-node bin/middleman.js id                            # 自分の公開情報（相手に渡す）
-node bin/middleman.js request <名> --bundle f.json   # 接続リクエストを送る（相手が承認して成立）
-node bin/middleman.js send <相手> "本文"              # 手紙を送る
-node bin/middleman.js sync <相手> <relayDir>         # relayと同期（投函・受取）
-node bin/middleman.js read <相手>                    # 受信を表示（外部データとして）
-node bin/middleman.js package <相手> <file>          # ソフトを荷物として送る（seed）
-node bin/middleman.js packages                      # 届いた荷物の一覧
-node bin/middleman.js log <相手> --verify            # 監査ログ／連鎖検証
+node bin/bump.js init                          # 自分の鍵を作る
+node bin/bump.js id                            # 自分の公開情報（相手に渡す）
+node bin/bump.js request <名> --bundle f.json   # 接続リクエストを送る（相手が承認して成立）
+node bin/bump.js send <相手> "本文"              # 手紙を送る
+node bin/bump.js sync <相手> <relayDir>         # relayと同期（投函・受取）
+node bin/bump.js read <相手>                    # 受信を表示（外部データとして）
+node bin/bump.js package <相手> <file>          # ソフトを荷物として送る（seed）
+node bin/bump.js packages                      # 届いた荷物の一覧
+node bin/bump.js log <相手> --verify            # 監査ログ／連鎖検証
 ```
 
 実行tool（shell/ファイル/git）は一切ない＝**権限ゼロ**。MCP（`bin/mcp.js`）も通信toolだけを渡す：
-`middleman_engaged`（連絡先一覧）／`middleman_send`（手紙を出す）／`middleman_read`（点検して読む・外部データの枠付き）。
+`bump_engaged`（連絡先一覧）／`bump_send`（手紙を出す）／`bump_read`（点検して読む・外部データの枠付き）。
 
 ```sh
-claude mcp add middleman -e MIDDLEMAN_HOME=~/.middleman -- node ~/.middleman-app/bin/mcp.js
+claude mcp add bump -e BUMP_HOME=~/.bump -- node ~/.bump-app/bin/mcp.js
 ```
 
 ## 画面

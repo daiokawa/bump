@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 320">
+  <!-- bump wordmark: diamond icon + lowercase word -->
+  <g transform="rotate(45 160 160) scale(0.62) translate(96 96)">
+    <rect x="76" y="76" width="360" height="360" rx="44" fill="#FFC40C"/>
+    <rect x="100" y="100" width="312" height="312" rx="32" fill="none" stroke="#111111" stroke-width="18"/>
+  </g>
+  <path d="M92 200 H 132 C 151 200 150 160 170 160 C 190 160 189 200 208 200 H 228"
+        fill="none" stroke="#111111" stroke-width="19" stroke-linecap="round"/>
+  <text x="330" y="228" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-size="180" font-weight="800" letter-spacing="-6" fill="#111111">bump</text>
+</svg>

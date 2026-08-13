@@ -1,4 +1,4 @@
-// middleman 配線盤：共通部品（DOM小道具・色・時刻・状態）。全ファイルが使うので最初に読む。
+// bump 配線盤：共通部品（DOM小道具・色・時刻・状態）。全ファイルが使うので最初に読む。
 
 const $=(id)=>document.getElementById(id);
 const el=(t,c)=>{const n=document.createElement(t);if(c)n.className=c;return n;};

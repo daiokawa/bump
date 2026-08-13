@@ -14,12 +14,12 @@ TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"
 RELAY_URL="${2:-$(cat installer/relay-url.local 2>/dev/null || echo "http://${TS_IP:-127.0.0.1}:8791")}"
 SLUG="$(printf '%s' "$LABEL" | tr ' /:*?"<>|' '_________')"  # ファイル名に使えない文字だけ置換（日本語は保持）
 
-APP="$ROOT/dist/middleman-$SLUG.app"
+APP="$ROOT/dist/bump-$SLUG.app"
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/repo"
 
-cp installer/launch.sh "$APP/Contents/MacOS/middleman"; chmod +x "$APP/Contents/MacOS/middleman"
+cp installer/launch.sh "$APP/Contents/MacOS/bump"; chmod +x "$APP/Contents/MacOS/bump"
 cp installer/Info.plist "$APP/Contents/Info.plist"
-cp installer/middleman.icns "$APP/Contents/Resources/middleman.icns" 2>/dev/null || true
+cp installer/bump.icns "$APP/Contents/Resources/bump.icns" 2>/dev/null || true
 
 # リポ一式（node_modules 同梱＝相手側 npm 不要）。scratch は除外。
 rsync -a --exclude .git --exclude dist --exclude '*.log' --exclude .playwright-mcp \
@@ -28,17 +28,17 @@ rsync -a --exclude .git --exclude dist --exclude '*.log' --exclude .playwright-m
 
 # ★焼き込み：relay住所（配布者の受信箱）＋宛先ラベル（系統）＋合言葉（本人確認）
 # 合言葉はこのパッケージの中にしか無い。載せた申請が届いたら、渡した先から出ていると分かる。
-# 発行の記録は配る側の ~/.middleman/invites.json に残る（誰に渡したかの台帳＝系統）。
-MMHOME="${MIDDLEMAN_HOME:-$HOME/.middleman}"
-TOKEN="$(MIDDLEMAN_HOME="$MMHOME" node bin/middleman.js invite "$LABEL")"
+# 発行の記録は配る側の ~/.bump/invites.json に残る（誰に渡したかの台帳＝系統）。
+MMHOME="${BUMP_HOME:-$HOME/.bump}"
+TOKEN="$(BUMP_HOME="$MMHOME" node bin/bump.js invite "$LABEL")"
 printf '%s' "$RELAY_URL" > "$APP/Contents/Resources/repo/relay-url.default"
 printf '%s' "$LABEL"     > "$APP/Contents/Resources/repo/recipient.txt"
 printf '%s' "$TOKEN"     > "$APP/Contents/Resources/repo/invite-token"
 # 配る側の公開鍵も焼き込む＝初回起動で接続リクエストまで自動で飛ぶ（貼り付ける文が要らない）。
 # 公開鍵と署名だけなので、パッケージが漏れても縁は作れない（承認は配る側の画面で人が押す）。
-MIDDLEMAN_HOME="$MMHOME" node bin/middleman.js id > "$APP/Contents/Resources/repo/owner-bundle.json"
+BUMP_HOME="$MMHOME" node bin/bump.js id > "$APP/Contents/Resources/repo/owner-bundle.json"
 printf '%s' "${OWNER_NAME:-大川}" > "$APP/Contents/Resources/repo/owner-name"
-# 版の刻印。gitを持たない配布先でも `middleman version` が答えられるようにする。
+# 版の刻印。gitを持たない配布先でも `bump version` が答えられるようにする。
 printf 'アプリ版 %s (%s) 宛先:%s\n' "$(date '+%Y-%m-%d')" "$(git rev-parse --short HEAD 2>/dev/null || echo '-')" "$LABEL" \
   > "$APP/Contents/Resources/repo/build.txt"
 
@@ -69,13 +69,13 @@ else
 fi
 # dist/ は配布zipだけを置く。旧版は old/ へ退避、.app（中間生成物）はzip後に消す。
 mkdir -p "$ROOT/dist/old"
-[ -f "$ROOT/dist/middleman-$SLUG.zip" ] && mv -f "$ROOT/dist/middleman-$SLUG.zip" "$ROOT/dist/old/middleman-$SLUG-$(date +%Y%m%d%H%M).zip"
-( cd "$ROOT/dist" && ditto -c -k --keepParent "middleman-$SLUG.app" "middleman-$SLUG.zip" )
+[ -f "$ROOT/dist/bump-$SLUG.zip" ] && mv -f "$ROOT/dist/bump-$SLUG.zip" "$ROOT/dist/old/bump-$SLUG-$(date +%Y%m%d%H%M).zip"
+( cd "$ROOT/dist" && ditto -c -k --keepParent "bump-$SLUG.app" "bump-$SLUG.zip" )
 rm -rf "$APP"
 
 echo "できました:"
-echo "  dist/middleman-$SLUG.zip   ← これを $LABEL さんに渡す"
+echo "  dist/bump-$SLUG.zip   ← これを $LABEL さんに渡す"
 echo "  relay(焼込): $RELAY_URL"
 echo "  宛先(系統):  $LABEL"
 echo "  合言葉:      焼込済（承認画面で自動照合されます）"
-du -h "$ROOT/dist/middleman-$SLUG.zip" | awk '{print "  size: " $1}'
+du -h "$ROOT/dist/bump-$SLUG.zip" | awk '{print "  size: " $1}'

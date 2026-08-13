@@ -6,28 +6,28 @@
 # 使い方: bash setup-practice-peer.sh        そのあと下に出るコマンドで常駐応答を起動。
 set -euo pipefail
 cd "$(dirname "$0")"
-SELF="$HOME/.middleman"
-HUB="$HOME/.middleman-hub"; PEER="$HUB/codex"; RELAY="$HUB/relay"
-run(){ node bin/middleman.js "$@"; }
+SELF="$HOME/.bump"
+HUB="$HOME/.bump-hub"; PEER="$HUB/codex"; RELAY="$HUB/relay"
+run(){ node bin/bump.js "$@"; }
 
 mkdir -p "$HUB" "$RELAY"
-[ -f "$SELF/identity.json" ] || MIDDLEMAN_HOME="$SELF" run init >/dev/null
-[ -f "$PEER/identity.json" ] || MIDDLEMAN_HOME="$PEER" run init >/dev/null
-MIDDLEMAN_HOME="$SELF" run id > "$HUB/self.json"
-MIDDLEMAN_HOME="$PEER" run id > "$HUB/peer-codex.json"
+[ -f "$SELF/identity.json" ] || BUMP_HOME="$SELF" run init >/dev/null
+[ -f "$PEER/identity.json" ] || BUMP_HOME="$PEER" run init >/dev/null
+BUMP_HOME="$SELF" run id > "$HUB/self.json"
+BUMP_HOME="$PEER" run id > "$HUB/peer-codex.json"
 # 両端で同じ縁の名前 "codex" を使う
-MIDDLEMAN_HOME="$SELF" run engage codex --bundle "$HUB/peer-codex.json" >/dev/null 2>&1 || true
-MIDDLEMAN_HOME="$PEER" run engage codex --bundle "$HUB/self.json" >/dev/null 2>&1 || true
-MIDDLEMAN_HOME="$SELF" run verify codex >/dev/null 2>&1 || true
-MIDDLEMAN_HOME="$PEER" run verify codex >/dev/null 2>&1 || true
+BUMP_HOME="$SELF" run engage codex --bundle "$HUB/peer-codex.json" >/dev/null 2>&1 || true
+BUMP_HOME="$PEER" run engage codex --bundle "$HUB/self.json" >/dev/null 2>&1 || true
+BUMP_HOME="$SELF" run verify codex >/dev/null 2>&1 || true
+BUMP_HOME="$PEER" run verify codex >/dev/null 2>&1 || true
 
 cat <<'TXT'
 練習相手 codex を用意しました。常駐応答を動かすには:
 
-  MIDDLEMAN_HOME=~/.middleman-hub/codex MM_RELAY_URL=http://127.0.0.1:8791 \
-    node bin/middleman.js rally codex ~/.middleman-hub/relay \
+  BUMP_HOME=~/.bump-hub/codex MM_RELAY_URL=http://127.0.0.1:8791 \
+    node bin/bump.js rally codex ~/.bump-hub/relay \
     --engine codex --serve --label codex \
     --persona "あなたはcodex。届いた報連相・依頼に、手元で調べたつもりで具体的に短く答える。" &
 
-止める: pkill -f "middleman.js rally"
+止める: pkill -f "bump.js rally"
 TXT

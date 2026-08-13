@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>middleman — つながる</title>
+<title>bump — つながる</title>
 <style>
   :root{--bg:#f4f7fa;--panel:#fff;--ink:#16202b;--muted:#6b7a8a;--line:#e2e8ee;--blue:#1f6feb;--green:#1f9d63;--red:#d1495b}
   *{box-sizing:border-box}
@@ -30,7 +30,7 @@ const el=(t,c)=>{const n=document.createElement(t);if(c)n.className=c;return n;}
 function show(nodes){const b=document.getElementById('box');b.textContent='';nodes.forEach(n=>b.append(n));}
 function fail(msg){
   const h=el('h1');h.textContent='つながれませんでした';const s=el('div','sub err');s.textContent=msg;
-  const btn=el('button');btn.textContent='middlemanを開く';btn.onclick=()=>location.href='/';
+  const btn=el('button');btn.textContent='bumpを開く';btn.onclick=()=>location.href='/';
   show([h,s,btn]);
 }
 (async()=>{
@@ -50,7 +50,7 @@ function fail(msg){
   const tag=el('div','tag eng');tag.textContent='engaged（未検証）';
   const note=el('div','sub');note.style.marginTop='12px';
   note.textContent='中間者ゼロの「検証済み」に上げるには、対面でQRをかざすか、合言葉を一度だけ確認します（設定の奥）。';
-  const btn=el('button');btn.textContent='middlemanを開く';btn.onclick=()=>location.href='/';
+  const btn=el('button');btn.textContent='bumpを開く';btn.onclick=()=>location.href='/';
   show([ava,h,s,tag,note,btn]);
 })();
 </script>

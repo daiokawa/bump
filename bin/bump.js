@@ -1,27 +1,27 @@
 #!/usr/bin/env node
-// middleman CLI — 手元AI同士の信頼できる経路。権限ゼロの郵便交換所。
+// bump CLI — 手元AI同士の信頼できる経路。権限ゼロの郵便交換所。
 //
 // このCLIは「配達」と「表示」だけを行う。受信文からアクションを生成しない
 // （invariant 1）。read/receive は復号・検証して保存・表示するのみ。
 // tool実行・shell・自動注入は一切しない。
 //
 // 使い方:
-//   middleman init                       自分のアイデンティティ生成
-//   middleman id                         自分の公開bundleを表示（相手に渡す）
-//   middleman device                     自分のdevice番号（鍵の指紋）を表示＝本人確認の読み合わせ用
-//   middleman version                    いま動いている版を表示
-//   middleman invite <label>             専用パッケージに焼き込む合言葉を発行（配る側・--list で一覧）
-//   middleman engage <pair> --bundle f   相手のbundleを取り込む（未検証）
-//   middleman safety <pair>              safety numberを表示（帯域外で突合）
-//   middleman verify <pair>              突合OKなら検証済みに固定
-//   middleman send <pair> <text...>      署名・暗号化してoutboxへ
-//   middleman deliver <pair> <inboxDir>  outbox→相手inboxへコピー（手動sync）
-//   middleman receive <pair>             inboxを復号・検証してmessagesへ
-//   middleman read <pair> [n]            受信メッセージを表示（外部データとして）
-//   middleman log <pair> [--verify]      監査ログ表示／連鎖検証
-//   middleman pairs                      既知ペア一覧
+//   bump init                       自分のアイデンティティ生成
+//   bump id                         自分の公開bundleを表示（相手に渡す）
+//   bump device                     自分のdevice番号（鍵の指紋）を表示＝本人確認の読み合わせ用
+//   bump version                    いま動いている版を表示
+//   bump invite <label>             専用パッケージに焼き込む合言葉を発行（配る側・--list で一覧）
+//   bump engage <pair> --bundle f   相手のbundleを取り込む（未検証）
+//   bump safety <pair>              safety numberを表示（帯域外で突合）
+//   bump verify <pair>              突合OKなら検証済みに固定
+//   bump send <pair> <text...>      署名・暗号化してoutboxへ
+//   bump deliver <pair> <inboxDir>  outbox→相手inboxへコピー（手動sync）
+//   bump receive <pair>             inboxを復号・検証してmessagesへ
+//   bump read <pair> [n]            受信メッセージを表示（外部データとして）
+//   bump log <pair> [--verify]      監査ログ表示／連鎖検証
+//   bump pairs                      既知ペア一覧
 //
-// 1マシンに2エンドを立てる時は MIDDLEMAN_HOME=~/.mm-a / ~/.mm-b で分ける。
+// 1マシンに2エンドを立てる時は BUMP_HOME=~/.mm-a / ~/.mm-b で分ける。
 
 import { mkdir, readFile, rename, copyFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
@@ -45,19 +45,19 @@ import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
 const __dir = dirname(fileURLToPath(import.meta.url));   // 専用パッケージに焼き込まれた物を読む用
 const now = () => new Date().toISOString();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const die = (msg) => { console.error(`middleman: ${msg}`); process.exit(1); };
+const die = (msg) => { console.error(`bump: ${msg}`); process.exit(1); };
 const out = (obj) => console.log(typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2));
 
 async function loadIdentity() {
   try { return await readJson(identityPath()); }
-  catch { die('アイデンティティ未生成。まず `middleman init`'); }
+  catch { die('アイデンティティ未生成。まず `bump init`'); }
 }
 
 // 縁があること（engaged）だけを要求する。かつては safety number 突合(verified)を必須にしていたが、
 // 本人確認は専用パッケージの合言葉が担うようになり、画面・MCPも engaged で動く。
 // CLIだけ止まると「画面からは送れるのにコマンドは弾かれる」ちぐはぐになるので揃える。
 async function requirePeer(pairId) {
-  if (!(await hasPeer(pairId))) die(`ペア "${pairId}" 未登録。まず \`middleman engage ${pairId} --bundle ...\``);
+  if (!(await hasPeer(pairId))) die(`ペア "${pairId}" 未登録。まず \`bump engage ${pairId} --bundle ...\``);
   return readPeer(pairId);
 }
 
@@ -69,7 +69,7 @@ async function cmdInit() {
   const id = generateIdentity(now());
   await writeJson(identityPath(), id);
   out(`アイデンティティを生成: device_id=${id.device_id}`);
-  out('相手に渡す公開bundleは `middleman id`');
+  out('相手に渡す公開bundleは `bump id`');
 }
 
 async function cmdId() {
@@ -98,7 +98,7 @@ async function cmdInvite(label, flags) {
     const rows = (await listInvites()).map((iv) => ({ label: iv.label, created_at: iv.created_at, used_at: iv.used_at }));
     return out(rows);
   }
-  if (!label) die('宛先ラベルが必要（例: `middleman invite 加賀爪`）');
+  if (!label) die('宛先ラベルが必要（例: `bump invite 加賀爪`）');
   out(await newInvite(label));
 }
 
@@ -113,7 +113,7 @@ async function cmdDevice() {
 async function cmdEngage(pairId, flags) {
   if (!pairId) die('pair_id が必要');
   const file = flags.bundle;
-  if (!file) die('--bundle <file> が必要（相手の `middleman id` 出力）');
+  if (!file) die('--bundle <file> が必要（相手の `bump id` 出力）');
   const bundle = JSON.parse(await readFile(file, 'utf8'));
   if (!bundle.device_id || !bundle.ed25519_pub || !bundle.x25519_pub) die('bundleの形式が不正');
   await ensurePair(pairId);
@@ -128,14 +128,14 @@ async function cmdEngage(pairId, flags) {
   await writePeer(pairId, peer);
   await logEvent(pairId, { type: 'engaged', peer: peer.device_id }, now());
   out(`ペア "${pairId}" を取り込みました（未検証）`);
-  out('次: `middleman safety ' + pairId + '` で相手と数字を突合 → 一致したら `middleman verify ' + pairId + '`');
+  out('次: `bump safety ' + pairId + '` で相手と数字を突合 → 一致したら `bump verify ' + pairId + '`');
 }
 
 // 接続申請を出す（新規参加側）。相手のバンドル(招待)を渡すだけ＝相手の画面に「承認」が出る。
 // これで「接続情報をコピペして返信」が不要になる（人間の作業ゼロのオンボーディング）。
 async function cmdRequest(pairId, flags) {
   const file = flags.bundle;
-  if (!file) die('--bundle <file> が必要（相手＝招待者の `middleman id` 出力）');
+  if (!file) die('--bundle <file> が必要（相手＝招待者の `bump id` 出力）');
   const bundle = JSON.parse(await readFile(file, 'utf8'));
   if (!bundle.device_id) die('bundleの形式が不正');
   const id = await loadIdentity();
@@ -161,7 +161,7 @@ async function cmdRequest(pairId, flags) {
 // ソフトを送る（seed）。相手の画面には「アップデートが届きました」として出るだけで、
 // 展開も実行もされない。適用するかは相手の人間とAIが決める。
 async function cmdPackage(pairId, file, flags) {
-  if (!file) die('送るファイルのパスが必要（例: middleman package 北原 ~/dist/voice-code-2.3.0.tar.gz）');
+  if (!file) die('送るファイルのパスが必要（例: bump package 北原 ~/dist/voice-code-2.3.0.tar.gz）');
   const id = await loadIdentity();
   const peer = await requirePeer(pairId);
   let pkg;
@@ -210,7 +210,7 @@ async function cmdSend(pairId, textParts) {
   if (!body) die('本文が空です');
   const { msg } = await sendMessage({ identity: id, peer, pairId, body, now });
   out(`送信キューへ: ${msg.id}`);
-  out(`配達: \`middleman deliver ${pairId} <相手inbox>\` / \`middleman sync ${pairId} <relayDir>\``);
+  out(`配達: \`bump deliver ${pairId} <相手inbox>\` / \`bump sync ${pairId} <relayDir>\``);
 }
 
 async function cmdDeliver(pairId, destInbox) {
@@ -231,7 +231,7 @@ async function cmdReceive(pairId) {
   const peer = await requirePeer(pairId);
   const r = await receiveInbox({ identity: id, peer, pairId, now });
   out(`受信: ${r.received.length}件 / 重複: ${r.skipped}件 / 拒否: ${r.rejected}件`);
-  if (r.received.length) out(`表示: \`middleman read ${pairId}\``);
+  if (r.received.length) out(`表示: \`bump read ${pairId}\``);
 }
 
 // 到達通知（中身は出さない＝invariant「通知はよい・入力はしない」）。
@@ -255,7 +255,7 @@ async function cmdWatch(pairId, relayDir, flags) {
       if (m.from === peer.device_id && !seen.has(m.id)) {
         seen.add(m.id);
         const t = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-        out(`📬 ${t} ${pairId} に新着 ── \`middleman read ${pairId}\` で本文（点検つき）`);
+        out(`📬 ${t} ${pairId} に新着 ── \`bump read ${pairId}\` で本文（点検つき）`);
       }
     }
     await sleep(everyMs);
@@ -265,7 +265,7 @@ async function cmdWatch(pairId, relayDir, flags) {
 // 常駐 watcher（大川さん決定の対称通知）。各手元端に1個。自分のrelayを見張り、
 // 自分宛の新着が来たら復号し、自分のタブのClaudeに「新着あり・readして」と一言だけ
 // send-keys（本文は挿入しない＝invariant）。中央なし・自分宛だけ・他人の箱は触らない。
-// 使い方: MIDDLEMAN_HOME=~/.middleman MM_RELAY=... middleman daemon --tmux <自分のtmuxセッション>
+// 使い方: BUMP_HOME=~/.bump MM_RELAY=... bump daemon --tmux <自分のtmuxセッション>
 async function cmdDaemon(flags) {
   // 常駐する側も、逼迫していたら動かない（半端に書いて壊すより止める）。
   if (!(await hasRoom())) die(`ディスクの空きが少なすぎます（${humanBytes(await freeBytes())}）。空きを作ってから起動してください`);
@@ -275,7 +275,7 @@ async function cmdDaemon(flags) {
   const everyMs = Number(flags.every) || 5000;
   const submit = flags['no-enter'] ? false : true;
   const seen = {};                   // pairId -> Set(既知の相手msg id。初見時は取り込み前の手元分で埋める)
-  out(`middleman daemon: 自端(${id.device_id.slice(0, 8)})を見張ります` +
+  out(`bump daemon: 自端(${id.device_id.slice(0, 8)})を見張ります` +
       (tmux ? `／新着は tmux "${tmux}" のClaudeへ通知` : '／通知は標準出力') + `（${everyMs}ms毎）`);
   for (;;) {
     for (const pairId of await listPairs()) {
@@ -306,14 +306,14 @@ async function cmdDaemon(flags) {
           if (!CONTROL_TYPES.includes(m.type)) fresh.push(m); } // 受領・プロフィール等の制御レターでは通知しない
       }
       if (fresh.length) {
-        const notice = `📬 middleman新着: [${pairId}] ${fresh.length}件。本文は未挿入です。\`middleman read ${pairId}\`（点検つき）で読んで対応してください。`;
-        const short = `[middleman] ${peer.name || pairId} から新着${fresh.length}件`; // 本文は載せない
+        const notice = `📬 bump新着: [${pairId}] ${fresh.length}件。本文は未挿入です。\`bump read ${pairId}\`（点検つき）で読んで対応してください。`;
+        const short = `[bump] ${peer.name || pairId} から新着${fresh.length}件`; // 本文は載せない
         if (tmux) await tmuxNotify(tmux, notice, submit).catch((e) => out(`notify失敗: ${e.message}`));
         else if (flags.notify === 'osa') {
           // 失敗を握り潰さない（通知許可が無い環境で"黙って届かない"のを防ぐ＝北原さん指摘）
           await osaNotify(short).catch((e) => out(`macOS通知失敗: ${e.message}（システム設定→通知でスクリプトエディタ/osascriptを許可してください）`));
         } else out(notice);
-        // 追加の通知フック（~/.middleman/notify.json）。Chatwork＝「誰から何件」だけ飛ばす。
+        // 追加の通知フック（~/.bump/notify.json）。Chatwork＝「誰から何件」だけ飛ばす。
         try {
           const cfg = await readJson(join(root(), 'notify.json')).catch(() => null);
           if (cfg && cfg.chatworkToken && cfg.chatworkRoom)
@@ -485,7 +485,7 @@ async function main() {
     case 'log': return cmdLog(rest[0], flags);
     case 'pairs': return cmdPairs();
     default:
-      out('middleman — 手元AI同士の信頼できる経路（権限ゼロの郵便交換所）');
+      out('bump — 手元AI同士の信頼できる経路（権限ゼロの郵便交換所）');
       out('commands: init｜id｜device｜version｜invite｜engage｜request｜safety｜verify｜send｜package｜packages｜deliver｜sync｜watch｜daemon｜receive｜rally｜read｜log｜pairs');
       if (cmd) process.exit(1);
   }

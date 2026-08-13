@@ -1,8 +1,8 @@
 # フェーズA 完了報告（OSS公開のローカル組み立て）
 
-作業日: 2026-08-09 ／ middlemanタブ。**push・公開は行っていない。** 運用中の `~/middleman` は未変更。
+作業日: 2026-08-09 ／ bumpタブ。**push・公開は行っていない。** 運用中の `~/bump` は未変更。
 
-## 成果物: `~/middleman-oss`（新規git・履歴なし・初期コミット1つ）
+## 成果物: `~/bump-oss`（新規git・履歴なし・初期コミット1つ）
 
 ## 裁定の反映
 - ライセンス: **MIT**（LICENSE 追加・Copyright 2026 Koichi Okawa）

@@ -1,4 +1,4 @@
-// middleman 配線盤：自分の設定まわり（プロフィール画像・連絡経路・通知・招待/QR）。
+// bump 配線盤：自分の設定まわり（プロフィール画像・連絡経路・通知・招待/QR）。
 
 function renderPics(){const a=$('avDrop');if(avatarData){$('avImg').src=avatarData;a.classList.add('has');}else a.classList.remove('has');const b=$('bnDrop');if(bannerData){$('bnImg').src=bannerData;b.classList.add('has');}else b.classList.remove('has');}
 // サイドバー頭の常設プロフィールカード（自分のバナー＋アイコン＋名前）。

@@ -7,7 +7,7 @@
 //   → 再起動しても seq が巻き戻らない（受信側cursorとの desync＝黙って配達が壊れる を防ぐ）
 //   → 再起動でも在中の手紙が消えない（喫茶店が一瞬閉まっても手紙は残る）
 // レイアウト: <BOX>/<routing_id>/<seq12>__<envelope_id>.json
-// 起動: node server/relay-server.js [port]   保存先: MM_RELAYBOX か既定 ~/.middleman/relaybox
+// 起動: node server/relay-server.js [port]   保存先: MM_RELAYBOX か既定 ~/.bump/relaybox
 // codexレビュー反映: カーソル方式(非破壊)・冪等(id重複は無視)・サイズ/件数/TTL/rate・空でも200。
 
 import { createServer } from 'node:http';
@@ -17,7 +17,7 @@ import { homedir } from 'node:os';
 import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
 
 const PORT = Number(process.argv[2]) || 8791;
-const BOX = process.env.MM_RELAYBOX || join(process.env.MIDDLEMAN_HOME || join(homedir(), '.middleman'), 'relaybox');
+const BOX = process.env.MM_RELAYBOX || join(process.env.BUMP_HOME || join(homedir(), '.bump'), 'relaybox');
 const MAX_ENV_BYTES = 1024 * 1024;     // envelope 1件の上限（seed=ソフト配布を載せるため1MB。2026-07-26）
 const MAX_PER_ROUTING = 500;           // routing_id ごとの保持件数（超えたら古いものから消す）
 const TTL_MS = 7 * 24 * 60 * 60 * 1000; // 保持期間（相手が長く寝ていても届くよう1週間）
@@ -118,9 +118,9 @@ server.requestTimeout = 20000;
 server.maxConnections = 200;
 await mkdir(BOX, { recursive: true });
 if (!(await hasRoom(BOX))) {
-  console.error(`middleman relay: ディスクの空きが少なすぎます（${humanBytes(await freeBytes(BOX))}）。空きを作ってから起動してください。`);
+  console.error(`bump relay: ディスクの空きが少なすぎます（${humanBytes(await freeBytes(BOX))}）。空きを作ってから起動してください。`);
   process.exit(1);
 }
 // localhostのみにbind。外への公開は Tailscale Funnel が 127.0.0.1 へプロキシする形で行う
 // （＝node自身は外向きポートを開かない。firewallダイアログ回避＋攻撃面の縮小。MM_BINDで上書き可）。
-server.listen(PORT, process.env.MM_BIND || '127.0.0.1', () => console.log(`middleman relay:  http://localhost:${PORT}  (disk永続 box=${BOX})`));
+server.listen(PORT, process.env.MM_BIND || '127.0.0.1', () => console.log(`bump relay:  http://localhost:${PORT}  (disk永続 box=${BOX})`));

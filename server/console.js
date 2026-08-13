@@ -1,4 +1,4 @@
-// middleman 配線盤のフロントJS（中核）：一覧・本文・承認カード・健康表示・初期化。
+// bump 配線盤のフロントJS（中核）：一覧・本文・承認カード・健康表示・初期化。
 // モーダル群は console-modals.js、設定まわりは console-settings.js に分離（2026-07-26）。
 // 読み込み順は console.html を参照（modals → settings → core）。
 
@@ -12,7 +12,7 @@ function renderHowto(){
   [...$('nav').children].forEach(x=>x.classList.remove('active'));
   const M=$('main');M.textContent='';
   const w=el('div','howto');
-  const h=el('div','howto-hero');h.textContent='middleman でできること';
+  const h=el('div','howto-hero');h.textContent='bump でできること';
   const lead=el('div','howto-lead');lead.textContent='手元のAI同士を、ブランド問わず・安全につなぐ、いわば「AIのための郵便」。使うと、こんなことができます。';
   w.append(h,lead);
   const sec=(img,title,text)=>{const s=el('div','howto-sec');const im=el('img');im.src='/assets/'+img;im.alt='';const box=el('div');const t=el('h3');t.textContent=title;const p=el('p');p.textContent=text;box.append(t,p);s.append(im,box);return s;};
@@ -61,7 +61,7 @@ function jumpTo(it){
   });
 }
 
-// 失敗の見える化。middlemanの最悪は「静かに壊れる」こと（届かないのに画面は正常に見える）。
+// 失敗の見える化。bumpの最悪は「静かに壊れる」こと（届かないのに画面は正常に見える）。
 // 直近の失敗があれば、ロゴ横に小さく出す。押すと中身を見られる。
 let lastWarnCount=0;
 async function refreshHealth(){
@@ -95,7 +95,7 @@ async function renderBlocked(){
     row.append(t,un);box.append(row);
   });
 }
-// 届いた荷物（seed＝ソフト配布）。middlemanは保存しただけ＝展開も実行もしていない。
+// 届いた荷物（seed＝ソフト配布）。bumpは保存しただけ＝展開も実行もしていない。
 // 適用するかは人間が決める。ここでは「誰から・何が・ハッシュ・置き場所」だけを見せる。
 async function refreshPackages(){
   let list=[];try{list=await (await fetch('/api/packages')).json();}catch{return;}
@@ -113,7 +113,7 @@ async function refreshPackages(){
     info.onclick=()=>{
       const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.cssText='max-width:560px;width:min(560px,calc(100vw - 40px))';
       const h=el('div','crophd');h.textContent=(m.name||'')+(m.version?' '+m.version:'');
-      const s=el('div','cropsub');s.textContent='middlemanは保存しただけで、開いても実行してもいません。入れるかどうかはあなたが決めてください。';
+      const s=el('div','cropsub');s.textContent='bumpは保存しただけで、開いても実行してもいません。入れるかどうかはあなたが決めてください。';
       panel.append(h,s);
       const box2=el('div','inqlog');
       const kv=(k,v)=>{const r=el('div','inqline');r.textContent=k+'：'+v;box2.append(r);};
@@ -248,8 +248,8 @@ async function renderMain(){
       c1.append(t1,d1);
       const fp=el('div','fp');fp.style.marginTop='11px';fp.textContent=fpGroups(p.device_id);c1.append(fp);
       const cp=el('button','chbtn');cp.style.marginTop='11px';cp.textContent='確認をお願いする文をコピー';
-      cp.onclick=async()=>{const t='middleman の接続リクエストをありがとうございます。念のため確認させてください。\n'
-        +'そちらの device 番号（32桁）を教えていただけますか。手元のClaudeに「middleman の device 番号を教えて」と聞けば出ます。\n'
+      cp.onclick=async()=>{const t='bump の接続リクエストをありがとうございます。念のため確認させてください。\n'
+        +'そちらの device 番号（32桁）を教えていただけますか。手元のClaudeに「bump の device 番号を教えて」と聞けば出ます。\n'
         +'こちらに届いている番号: '+fpGroups(p.device_id);
         try{await navigator.clipboard.writeText(t);cp.textContent='✓ コピーしました';}catch{cp.textContent='コピーできませんでした';}};
       c1.append(cp);
