@@ -1,5 +1,5 @@
 {
-  "name": "bumpd",
+  "name": "@daiokawa/bump",
   "version": "0.0.1",
   "description": "手元AI同士の信頼できる経路。非同期・P2P・目隠しの1:1交換所。権限ゼロ。",
   "type": "module",
