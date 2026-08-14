@@ -25,6 +25,17 @@ ask(){ [ -n "$NONI" ] && { echo ""; return; }; osascript -e "text returned of (d
 
 [ -x "$NODE" ] || { alert "Node.js が見つかりません。claude cli を入れていれば Node もあります（要 Node 20+）。"; exit 1; }
 
+# 0.5) 自動更新: GitHubの最新を取れたら、それを導入元に重ねる（人がアプリを開いた時だけ動く）。
+# 取れない環境（オフライン・git無し）は同梱版で進む＝更新は付加であって前提ではない。
+UPDATED_SHA=""
+if command -v git >/dev/null 2>&1 && git ls-remote --heads https://github.com/daiokawa/bump.git >/dev/null 2>&1; then
+  rm -rf "$HOME/.bump-latest"
+  if git clone -q --depth 1 https://github.com/daiokawa/bump.git "$HOME/.bump-latest" 2>/dev/null; then
+    UPDATED_SHA="$(cd "$HOME/.bump-latest" && git rev-parse --short HEAD)"
+    echo "auto-update: GitHubの最新を取得 ($UPDATED_SHA)"
+  fi
+fi
+
 # 1) 導入（依存同梱ごとコピー・安定パスへ）
 case "$DEST" in "$HOME"/.*-app) rm -rf "$DEST";; esac   # openrsyncのdelete-excluded不動作対策（全入れ替え）
 mkdir -p "$DEST" "$RELAY"

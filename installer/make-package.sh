@@ -70,7 +70,10 @@ fi
 # dist/ は配布zipだけを置く。旧版は old/ へ退避、.app（中間生成物）はzip後に消す。
 mkdir -p "$ROOT/dist/old"
 [ -f "$ROOT/dist/bump-$SLUG.zip" ] && mv -f "$ROOT/dist/bump-$SLUG.zip" "$ROOT/dist/old/bump-$SLUG-$(date +%Y%m%d%H%M).zip"
-( cd "$ROOT/dist" && ditto -c -k --keepParent "bump-$SLUG.app" "bump-$SLUG.zip" )
+# --norsrc: AppleDouble(拡張属性の写し)をzipに含めない。含めると unzip コマンド展開で
+# ._* が実体化して封（seal）が壊れ、spctl が invalid を返す（H.S.報告 2026-08-14）。
+# 署名も公証チケットも実ファイル側にあるので、落として問題ない。
+( cd "$ROOT/dist" && ditto -c -k --norsrc --keepParent "bump-$SLUG.app" "bump-$SLUG.zip" )
 rm -rf "$APP"
 
 echo "できました:"
