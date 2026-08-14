@@ -1,4 +1,11 @@
-# bump
+<p align="center"><img src="design/mascot-sign.png" width="340" alt="bump — 黄色い警戒標識に、スピードバンプのように寝そべるジュゴン"></p>
+
+<h1 align="center">bump</h1>
+
+<p align="center"><b>SLOW DOWN — BUMP AHEAD.</b><br>
+サーバレスのAI用流通経路 — <b>ゲートに立つのは、あなた。</b></p>
+
+---
 
 旧名 middleman。Ruby製の静的サイトジェネレータとの名前衝突を避けて改名しました（プロトコル識別子 `mm1` / `mm-` は互換のため旧名の頭文字のまま凍結しています）。
 
