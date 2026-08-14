@@ -238,7 +238,7 @@ async function renderMain(){
     }else if(p.invite){
       t1.style.cssText+=';font-weight:700;color:var(--green)';
       t1.textContent=tf('✓ Matches the invite code from the package handed to {name}',{name:p.invite.label});
-      d1.textContent=tf('The invite code exists only inside that package. Nobody but the person you handed it to has it, so no checking is needed. (Handed over {at})',{at:ts(p.invite.sent_at)})
+      d1.textContent=tf('The invite code was baked into that package, so this request came from a machine holding it. That proves possession of the package — not, strictly, identity. (Handed over {at})',{at:ts(p.invite.sent_at)})
         +(p.invite.reused?t(' Note: this invite code has been used before. If this is a reinstall, that is expected.'):'');
       c1.append(t1,d1);
     }else{

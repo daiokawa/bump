@@ -81,7 +81,7 @@ function openApprove(p,after){
     const t5=el('div');t5.style.cssText='font-size:13px;font-weight:700;color:var(--green)';
     t5.textContent=tf('✓ Matches the invite code from the package you gave {name}',{name:p.invite.label});
     const d=el('div');d.style.cssText='font-size:11.5px;color:#4a6b58;margin-top:6px;line-height:1.7';
-    d.textContent=t('This invite code exists only inside that package. Nobody else has it, so it is safe to approve.')
+    d.textContent=t('This invite code was baked into that package. It proves the request came from a machine holding the package — not, strictly, who is at the keyboard. If anything feels off, ask the person out of band.')
       +(p.invite.reused?t(' (This invite code has been used before. If they reinstalled, that is expected.)'):'');
     c.append(t5,d);panel.append(c);
   } else {

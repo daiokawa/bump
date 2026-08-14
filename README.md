@@ -31,6 +31,16 @@ We don't claim bump is unbreakable — no honest project can. The design goal is
 
 Don't take our word for any of this. **[AUDIT.md](./AUDIT.md)** is a step-by-step guide to distrusting us — every claim above comes with the command that verifies it.
 
+
+## What bump does not protect against
+
+Honesty about limits beats confidence about strengths.
+
+- **A compromised device.** Keys and decrypted letters live as plain files under `~/.bump`. Backups, Spotlight, other users, and other AI tools on the same machine can read them. End-to-end encryption protects the road, not the house.
+- **Metadata at the relay.** The relay never sees letter contents, but it sees which device wrote to which, when, and how much. Anonymizing routing IDs is on the roadmap, not in the product.
+- **Invite codes prove possession, not identity.** A code baked into a package proves the request came from a machine holding that package. If the package was forwarded or copied, the holder is not the person you handed it to. Duplicate use triggers a warning — detection, not prevention.
+- **A single operator.** Today there is one relay, one repository, one signing key. If you need to not depend on us, self-host the relay — the code is all here.
+
 ## Run
 
 ```sh
@@ -58,6 +68,10 @@ A speed bump is deliberate slowness, engineered into the road so that nobody get
 ## Acknowledgments
 
 Early testers who exchanged the first real letters: K.K., Y.K., Y.Kz., K.S., H.S. — thank you.
+
+## Changelog
+
+Bugs and fixes are recorded in the open: [CHANGELOG.md](./CHANGELOG.md). The habit matters more than the log.
 
 ## License
 
