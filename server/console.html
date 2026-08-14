@@ -22,11 +22,12 @@
   .brand{cursor:pointer;user-select:none}
   .brand b{font-size:17px;font-weight:800;letter-spacing:-.015em}.brand i{font-style:normal;color:var(--blue)}
   /* ロゴ横のジュゴン。水面から顔の上半分だけ・5コマ往復（steps()でパラパラ感） */
-  .dugong{display:inline-block;vertical-align:-8px;margin-left:8px}
-  .dg-bob{animation:dgbob 2.2s steps(1,end) infinite alternate}
-  @keyframes dgbob{0.0%{transform:translateY(-0.0px)}6.25%{transform:translateY(-0.05px)}12.5%{transform:translateY(-0.19px)}18.75%{transform:translateY(-0.42px)}25.0%{transform:translateY(-0.73px)}31.25%{transform:translateY(-1.11px)}37.5%{transform:translateY(-1.54px)}43.75%{transform:translateY(-2.01px)}50.0%{transform:translateY(-2.5px)}56.25%{transform:translateY(-2.99px)}62.5%{transform:translateY(-3.46px)}68.75%{transform:translateY(-3.89px)}75.0%{transform:translateY(-4.27px)}81.25%{transform:translateY(-4.58px)}87.5%{transform:translateY(-4.81px)}93.75%{transform:translateY(-4.95px)}100.0%{transform:translateY(-5.0px)}}
-  .dg-wave{animation:dgwave 3.6s ease-in-out infinite alternate}
-  @keyframes dgwave{from{transform:translateX(0)}to{transform:translateX(-5px)}}
+  /* ロゴ横のジュゴン。元絵（標識のマスコット）が静かな水の帯に浮いて17コマで上下する。
+     水の帯は動かさない・ジュゴンの沈み込みを深くして白い隙間を出さない。 */
+  .dugong{position:relative;display:inline-block;vertical-align:-7px;margin-left:9px;height:26px}
+  .dg-img{display:block;width:58px;height:auto;animation:dgbob 2.4s steps(1,end) infinite alternate}
+  .dg-water{position:absolute;left:-5px;right:-5px;bottom:-3px;height:13px;background:#9ec3de;border-radius:6px;opacity:.95}
+  @keyframes dgbob{0.0%{transform:translateY(-0.0px)}6.25%{transform:translateY(-0.04px)}12.5%{transform:translateY(-0.15px)}18.75%{transform:translateY(-0.34px)}25.0%{transform:translateY(-0.59px)}31.25%{transform:translateY(-0.89px)}37.5%{transform:translateY(-1.23px)}43.75%{transform:translateY(-1.61px)}50.0%{transform:translateY(-2.0px)}56.25%{transform:translateY(-2.39px)}62.5%{transform:translateY(-2.77px)}68.75%{transform:translateY(-3.11px)}75.0%{transform:translateY(-3.41px)}81.25%{transform:translateY(-3.66px)}87.5%{transform:translateY(-3.85px)}93.75%{transform:translateY(-3.96px)}100.0%{transform:translateY(-4.0px)}}
   .tbtn{border:0;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;background:var(--blue);color:#fff}
   .tbtn:active{transform:scale(.98)}
   /* 自分プロフィールの常設カード（サイドバー頭・クリックで設定） */
@@ -200,7 +201,7 @@
   <div class="side">
     <div class="side-head">
       <div class="brandrow">
-        <div class="brand" id="brand" title="Home" data-ja-title="トップへ"><b>bu<i>mp</i></b><span class="dugong" aria-hidden="true"><svg viewBox="0 0 44 26" width="58" height="34"><defs><clipPath id="dgw"><rect x="0" y="0" width="44" height="18.5"/></clipPath></defs><g clip-path="url(#dgw)"><g class="dg-bob"><ellipse cx="22" cy="21" rx="13" ry="10" fill="#8fa0b4"/><ellipse cx="22" cy="17" rx="8.5" ry="5.5" fill="#a3b2c4"/><circle cx="17.5" cy="14" r="1.5" fill="#233041"/><circle cx="26.5" cy="14" r="1.5" fill="#233041"/><circle cx="17.9" cy="13.6" r="0.5" fill="#fff"/><circle cx="26.9" cy="13.6" r="0.5" fill="#fff"/><ellipse cx="20.5" cy="17.3" rx="0.9" ry="1.2" fill="#54627a"/><ellipse cx="23.5" cy="17.3" rx="0.9" ry="1.2" fill="#54627a"/></g></g><path class="dg-wave" d="M0 18.5 Q 5.5 16.9 11 18.5 T 22 18.5 T 33 18.5 T 44 18.5 V 26 H 0 Z" fill="#9ec3de" opacity="0.95"/></svg></span></div>
+        <div class="brand" id="brand" title="Home" data-ja-title="トップへ"><b>bu<i>mp</i></b><span class="dugong" aria-hidden="true"><img class="dg-img" src="/assets/dugong.png" alt=""><i class="dg-water"></i></span></div>
         <button class="warnbtn" id="warnBtn" style="display:none" title="What went wrong" data-ja-title="うまくいかなかったこと"></button><button class="howto-mini" id="howto" data-ja="つかいかた">How it works</button>
       </div>
       <div class="meCard" id="settings" title="Edit profile (settings)" data-ja-title="プロフィールを編集（設定）">
