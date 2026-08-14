@@ -21,6 +21,12 @@
   .brandrow{display:flex;align-items:center;justify-content:space-between;padding:0 2px}
   .brand{cursor:pointer;user-select:none}
   .brand b{font-size:17px;font-weight:800;letter-spacing:-.015em}.brand i{font-style:normal;color:var(--blue)}
+  /* ロゴ横のジュゴン。水面から顔の上半分だけ・5コマ往復（steps()でパラパラ感） */
+  .dugong{display:inline-block;vertical-align:-4px;margin-left:7px}
+  .dg-bob{animation:dgbob 1.8s steps(1,end) infinite alternate}
+  @keyframes dgbob{0%{transform:translateY(0)}25%{transform:translateY(-1.2px)}50%{transform:translateY(-2.4px)}75%{transform:translateY(-3.4px)}100%{transform:translateY(-4.2px)}}
+  .dg-wave{animation:dgwave 3.6s ease-in-out infinite alternate}
+  @keyframes dgwave{from{transform:translateX(0)}to{transform:translateX(-5px)}}
   .tbtn{border:0;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;background:var(--blue);color:#fff}
   .tbtn:active{transform:scale(.98)}
   /* 自分プロフィールの常設カード（サイドバー頭・クリックで設定） */
@@ -194,7 +200,7 @@
   <div class="side">
     <div class="side-head">
       <div class="brandrow">
-        <div class="brand" id="brand" title="Home" data-ja-title="トップへ"><b>bu<i>mp</i></b></div>
+        <div class="brand" id="brand" title="Home" data-ja-title="トップへ"><b>bu<i>mp</i></b><span class="dugong" aria-hidden="true"><svg viewBox="0 0 44 26" width="34" height="20"><defs><clipPath id="dgw"><rect x="0" y="0" width="44" height="17"/></clipPath></defs><g clip-path="url(#dgw)"><g class="dg-bob"><ellipse cx="22" cy="20" rx="13" ry="10" fill="#9aa7b2"/><ellipse cx="22" cy="16.5" rx="8.5" ry="5.5" fill="#aeb9c3"/><circle cx="17.5" cy="13.5" r="1.5" fill="#2b3540"/><circle cx="26.5" cy="13.5" r="1.5" fill="#2b3540"/><circle cx="17.9" cy="13.1" r="0.5" fill="#fff"/><circle cx="26.9" cy="13.1" r="0.5" fill="#fff"/><ellipse cx="20.5" cy="16.8" rx="0.9" ry="1.2" fill="#5d6a75"/><ellipse cx="23.5" cy="16.8" rx="0.9" ry="1.2" fill="#5d6a75"/></g></g><path class="dg-wave" d="M0 17 Q 5.5 15.4 11 17 T 22 17 T 33 17 T 44 17 V 26 H 0 Z" fill="#bfe0ea" opacity="0.9"/></svg></span></div>
         <button class="warnbtn" id="warnBtn" style="display:none" title="What went wrong" data-ja-title="うまくいかなかったこと"></button><button class="howto-mini" id="howto" data-ja="つかいかた">How it works</button>
       </div>
       <div class="meCard" id="settings" title="Edit profile (settings)" data-ja-title="プロフィールを編集（設定）">
