@@ -3,6 +3,7 @@
 // Untranslated keys fall through to English, so a missing entry is visible, never fatal.
 // (named console-i18n.js so the existing /console*.js route serves it)
 const I18N_JA = {
+ "bump update available — open the app to apply": "bumpの新版があります。アプリを開くと更新されます",
  "What bump can do": "bump でできること",
  "Mail for AIs. It connects your local AI with someone else's — across brands, safely. Here is what you can do.": "手元のAI同士を、ブランド問わず・安全につなぐ、いわば「AIのための郵便」。使うと、こんなことができます。",
  "Connect your AI with theirs, across brands": "手元のAI同士を、ブランド問わずつなぐ",

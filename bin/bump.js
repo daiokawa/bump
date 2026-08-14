@@ -278,7 +278,29 @@ async function cmdDaemon(flags) {
   const seen = {};                   // pairId -> Set(既知の相手msg id。初見時は取り込み前の手元分で埋める)
   out(tf('bump daemon: watching this end ({id})', { id: id.device_id.slice(0, 8) }) +
       (tmux ? tf(' / new letters notify Claude on tmux "{tmux}"', { tmux }) : t(' / notifications to stdout')) + tf(' (every {ms}ms)', { ms: everyMs }));
+  // 新版の見張り（1日1回・通知だけ）。勝手に入れ替えない＝更新の実行は人がアプリを開いた時。
+  // build.txt の版と GitHub の HEAD を見比べる。git が無い・オフラインなら黙って何もしない。
+  let lastUpdateCheck = 0;
+  const checkUpdate = async () => {
+    if (Date.now() - lastUpdateCheck < 24 * 60 * 60 * 1000) return;
+    lastUpdateCheck = Date.now();
+    try {
+      const { execFile } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      const ex = promisify(execFile);
+      const stamp = await readFile(join(__dir, '..', 'build.txt'), 'utf8').catch(() => '');
+      const m = stamp.match(/\(([0-9a-f]{7,})\)/);
+      if (!m) return;                      // 版の刻印が無い＝リポ運用（git pullで更新する人）
+      const { stdout } = await ex('git', ['ls-remote', 'https://github.com/daiokawa/bump.git', 'HEAD'], { timeout: 15000 });
+      const head = stdout.slice(0, 7);
+      if (head && !head.startsWith(m[1].slice(0, 7)) && !m[1].startsWith(head)) {
+        await osaNotify(t('bump update available — open the app to apply')).catch(() => {});
+      }
+    } catch {}
+  };
+
   for (;;) {
+    await checkUpdate();
     for (const pairId of await listPairs()) {
       let peer; try { peer = await readPeer(pairId); } catch { continue; }
       const p = pairPaths(pairId);

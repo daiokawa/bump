@@ -29,6 +29,17 @@ ask(){ [ -n "$NONI" ] && { echo ""; return; }; osascript -e "text returned of (d
 case "$DEST" in "$HOME"/.*-app) rm -rf "$DEST";; esac   # openrsyncのdelete-excluded不動作対策（全入れ替え）
 mkdir -p "$DEST" "$RELAY"
 rsync -a --exclude .git --exclude /dist --exclude '*.log' --exclude .playwright-mcp --exclude .mcp.json --exclude .DS_Store --exclude '._*' "$HERE/" "$DEST/"
+# 最新版が取れていれば、コード部分だけ上に重ねる（node_modulesは同梱を使い、
+# 依存が変わっていた時だけ npm ci で揃える。失敗したら同梱のまま＝動くものを壊さない）。
+if [ -n "$UPDATED_SHA" ]; then
+  if ! cmp -s "$HOME/.bump-latest/package-lock.json" "$DEST/package-lock.json"; then NEED_CI=1; else NEED_CI=""; fi
+  rsync -a --exclude .git --exclude node_modules "$HOME/.bump-latest/" "$DEST/"
+  if [ -n "$NEED_CI" ]; then
+    (cd "$DEST" && npm ci --omit=dev >/dev/null 2>&1) && echo "auto-update: 依存も更新" || echo "auto-update: 依存更新に失敗（同梱のまま続行）"
+  fi
+  printf 'アプリ版 %s (%s) auto-updated\n' "$(date '+%Y-%m-%d')" "$UPDATED_SHA" > "$DEST/build.txt"
+  rm -rf "$HOME/.bump-latest"
+fi
 cd "$DEST" || exit 1
 
 # 1.5) 旧middlemanからの乗り換え（初回のみ）。鍵と手紙を新パスへ写し、旧常駐を撤去する。
