@@ -28,8 +28,22 @@ ask(){ [ -n "$NONI" ] && { echo ""; return; }; osascript -e "text returned of (d
 # 1) 導入（依存同梱ごとコピー・安定パスへ）
 case "$DEST" in "$HOME"/.*-app) rm -rf "$DEST";; esac   # openrsyncのdelete-excluded不動作対策（全入れ替え）
 mkdir -p "$DEST" "$RELAY"
-rsync -a --exclude .git --exclude dist --exclude '*.log' --exclude .playwright-mcp --exclude .mcp.json --exclude .DS_Store --exclude '._*' "$HERE/" "$DEST/"
+rsync -a --exclude .git --exclude /dist --exclude '*.log' --exclude .playwright-mcp --exclude .mcp.json --exclude .DS_Store --exclude '._*' "$HERE/" "$DEST/"
 cd "$DEST" || exit 1
+
+# 1.5) 旧middlemanからの乗り換え（初回のみ）。鍵と手紙を新パスへ写し、旧常駐を撤去する。
+# これが無いと ~/.bump に新しい鍵が生成され、既存テスターが「別人」になる
+# （K.S.報告 2026-08-14: 手紙・ペア・検証フラグが引き継がれず、新規申請が飛ぶ）。
+if [ ! -d "$MIDHOME" ] && [ -d "$HOME/.middleman" ]; then
+  cp -a "$HOME/.middleman" "$MIDHOME"
+  [ -d "$HOME/.middleman-hub" ] && [ ! -d "$HUB" ] && cp -a "$HOME/.middleman-hub" "$HUB"
+  echo "migrated: ~/.middleman → $MIDHOME（旧データは残置・削除しない）"
+  # 旧常駐の撤去（放置すると通知の二重化と8790の取り合いになる）
+  for L in $(launchctl list 2>/dev/null | awk '$3 ~ /middleman/ && $3 !~ /^application\./ {print $3}'); do
+    launchctl bootout "gui/$(id -u)/${L}" >/dev/null 2>&1 && echo "旧launchd停止: ${L}"
+  done
+  pkill -f "middleman.js daemon" >/dev/null 2>&1 || true
+fi
 
 # 2) 自分のエンド（鍵）を生成（冪等）
 [ -f "$MIDHOME/identity.json" ] || BUMP_HOME="$MIDHOME" "$NODE" bin/bump.js init >/dev/null

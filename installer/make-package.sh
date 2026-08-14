@@ -22,7 +22,7 @@ cp installer/Info.plist "$APP/Contents/Info.plist"
 cp installer/bump.icns "$APP/Contents/Resources/bump.icns" 2>/dev/null || true
 
 # リポ一式（node_modules 同梱＝相手側 npm 不要）。scratch は除外。
-rsync -a --exclude .git --exclude dist --exclude '*.log' --exclude .playwright-mcp \
+rsync -a --exclude .git --exclude /dist --exclude '*.log' --exclude .playwright-mcp \
   --exclude '*.png' --exclude installer --exclude relaybox \
   "$ROOT/" "$APP/Contents/Resources/repo/"
 
