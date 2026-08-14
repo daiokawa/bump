@@ -53,6 +53,18 @@ if [ -n "$UPDATED_SHA" ]; then
 fi
 cd "$DEST" || exit 1
 
+# 1.4) 事故でできた「空の鍵」の救済。壊れた版が移行せずに新しい鍵だけ作った場合、
+# ~/.bump は在るが縁がゼロ。フォルダの有無だけで移行をスキップすると、この状態は
+# 修正版を開いても直らない（Y.K.指摘 2026-08-14）。縁の実在で見分け、事故鍵は消さず退避する。
+if [ -d "$MIDHOME" ] && [ -d "$HOME/.middleman" ]; then
+  bump_bonds=$(ls "$MIDHOME"/pairs/*/peer.json 2>/dev/null | wc -l | tr -d ' ')
+  old_bonds=$(ls "$HOME/.middleman"/pairs/*/peer.json 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$bump_bonds" -eq 0 ] && [ "$old_bonds" -gt 0 ]; then
+    mv "$MIDHOME" "$MIDHOME.fresh-$(date +%Y%m%d%H%M%S)"
+    echo "rescue: 縁ゼロの $MIDHOME を退避（事故で出来た鍵の可能性）。旧データから移行し直します"
+  fi
+fi
+
 # 1.5) 旧middlemanからの乗り換え（初回のみ）。鍵と手紙を新パスへ写し、旧常駐を撤去する。
 # これが無いと ~/.bump に新しい鍵が生成され、既存テスターが「別人」になる
 # （K.S.報告 2026-08-14: 手紙・ペア・検証フラグが引き継がれず、新規申請が飛ぶ）。
