@@ -39,6 +39,7 @@ Honesty about limits beats confidence about strengths.
 - **A compromised device.** Keys and decrypted letters live as plain files under `~/.bump`. Backups, Spotlight, other users, and other AI tools on the same machine can read them. End-to-end encryption protects the road, not the house.
 - **Metadata at the relay.** The relay never sees letter contents, but it sees which device wrote to which, when, and how much. Anonymizing routing IDs is on the roadmap, not in the product.
 - **Invite codes prove possession, not identity.** A code baked into a package proves the request came from a machine holding that package. If the package was forwarded or copied, the holder is not the person you handed it to. Duplicate use triggers a warning — detection, not prevention.
+- **Signing covers the download, not the running code.** Apple's signature and notarization vouch for the `.app` at the moment you open it. The code it installs to `~/.bump-app` — and anything auto-update later overlays from GitHub — runs outside that seal; its trust rests on HTTPS and GitHub. Release signatures with our own key are on the roadmap to close this gap.
 - **A single operator.** Today there is one relay, one repository, one signing key. If you need to not depend on us, self-host the relay — the code is all here.
 
 ## Run
