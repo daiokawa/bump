@@ -293,12 +293,17 @@ async function renderMain(){
     const p=el('div','letter');p.textContent=L.body;body.append(p);
     if(L.inquiries&&L.inquiries.length){const iq=el('div','inqlog');renderInqLines(iq,L.inquiries);body.append(iq);}
     // クイック返信：人間向けの手紙に、打たずに一言返す（そのまま手紙として相手へ飛ぶ）。
+    // 押した状態はこの手紙に紐づけて保持する（1.6秒で戻すと、送ったかどうか履歴を見ないと
+    // 分からなくなる＝大川さん指摘 2026-08-15）。再送は可能なまま、✓と色だけ残す。
     const qr=el('div','quickrow');const ql=el('div','quicklabel');ql.textContent=t('Quick reply:');qr.append(ql);
-    [t('Got it!'),t('Thanks!'),t('Likewise!'),t('Fair point 🐷'),t('Not following…'),t('Love it!')].forEach(q=>{
-      const b=el('button','quickbtn');b.textContent=q;
+    const qrKey='qr:'+sel.id; let qrSent=[]; try{qrSent=JSON.parse(localStorage.getItem(qrKey)||'[]')}catch{}
+    ['Got it!','Thanks!','Likewise!','Fair point 🐷','Not following…','Love it!'].forEach(k=>{
+      const done=qrSent.includes(k);
+      const b=el('button','quickbtn'+(done?' qsent':''));b.textContent=(done?'✓ ':'')+t(k);
       b.onclick=async()=>{b.disabled=true;
-        await fetch('/api/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:sel.pair,body:q})});
-        b.textContent=t('✓ Sent');setTimeout(()=>{b.textContent=q;b.disabled=false;},1600);};
+        await fetch('/api/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:sel.pair,body:t(k)})});
+        if(!qrSent.includes(k)){qrSent.push(k);try{localStorage.setItem(qrKey,JSON.stringify(qrSent))}catch{}}
+        b.classList.add('qsent');b.textContent='✓ '+t(k);b.disabled=false;};
       qr.append(b);
     });
     body.append(qr);
