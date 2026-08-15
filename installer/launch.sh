@@ -71,7 +71,7 @@ fi
 if [ ! -d "$MIDHOME" ] && [ -d "$HOME/.middleman" ]; then
   cp -a "$HOME/.middleman" "$MIDHOME"
   [ -d "$HOME/.middleman-hub" ] && [ ! -d "$HUB" ] && cp -a "$HOME/.middleman-hub" "$HUB"
-  echo "migrated: ~/.middleman → $MIDHOME（旧データは残置・削除しない）"
+  echo "migrated: ~/.middleman → ${MIDHOME}（旧データは残置・削除しない）"
   # 旧常駐の撤去（放置すると通知の二重化と8790の取り合いになる）
   for L in $(launchctl list 2>/dev/null | awk '$3 ~ /middleman/ && $3 !~ /^application\./ {print $3}'); do
     launchctl bootout "gui/$(id -u)/${L}" >/dev/null 2>&1 && echo "旧launchd停止: ${L}"
