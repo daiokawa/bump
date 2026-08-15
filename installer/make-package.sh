@@ -9,6 +9,16 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
 LABEL="${1:?宛先名を指定してください（例: K.K.）}"
+
+# ── 出荷前lint ─────────────────────────────────────────────
+# bash 3.2 は「$変数の直後に全角文字」を変数名に食い込み、set -u で止まる（ja locale時のみ・
+# 実地で計2回踏んだ 2026-08-14/15）。個別修正では再発するので、ここで機械検査して作らせない。
+if ! perl -ne 'exit 1 if /\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/' $(git ls-files '*.sh'); then
+  echo "NG: \$変数の直後に非ASCII文字があるshがあります（bash3.2でset -u死）。\${変数} に直してください:"
+  perl -ne 'print "  $ARGV:$.: $&\n" if /\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/' $(git ls-files '*.sh')
+  exit 1
+fi
+
 TS_IP="$(tailscale ip -4 2>/dev/null | head -1)"
 # 既定relayはローカルファイル（gitに入れない＝リポジトリ公開時にURLを晒さない）
 RELAY_URL="${2:-$(cat installer/relay-url.local 2>/dev/null || echo "http://${TS_IP:-127.0.0.1}:8791")}"
