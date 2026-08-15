@@ -119,12 +119,16 @@ alive_http() { curl -s -o /dev/null --max-time 3 "http://localhost:$PORT/api/sta
 if [ "$PORT" = "8790" ]; then
   # application.* ＝ open経由で起動された「このアプリ自身」のラベル。含めると自分をbootout
   # して更新の途中で死に、旧版が残る（旧名時代の実報告 2026-08-13）。ラベルはフィールドで見る。
-  for L in $(launchctl list 2>/dev/null | awk '$3 ~ /bump/ && $3 !~ /^application\./ {print $3}'); do
+  # 旧名(middleman)のlaunchdもここで毎回掃く。移行ブロック内の撤去だけだと、移行初回が
+  # 途中で死んだ場合に撤去だけが永久にスキップされる（K.K.指摘 2026-08-16: 通知二重化と
+  # 8790の取り合いが残る片道の穴）。毎回実行なら冪等で、残骸が無ければ何もしない。
+  for L in $(launchctl list 2>/dev/null | awk '$3 ~ /bump|middleman/ && $3 !~ /^application\./ {print $3}'); do
     launchctl bootout "gui/$(id -u)/${L}" >/dev/null 2>&1 && echo "launchd stop: ${L} (replacing with the new build)"
   done
 fi
 pkill -f "server/web.js $PORT" >/dev/null 2>&1
 [ "$PORT" = "8790" ] && pkill -f "bump.js daemon" >/dev/null 2>&1
+[ "$PORT" = "8790" ] && pkill -f "middleman.js daemon" >/dev/null 2>&1   # 旧名の常駐も毎回
 sleep 1
 nohup "$NODE" server/web.js "$PORT" >>"$LOG" 2>&1 &
 for i in 1 2 3 4 5 6 7 8; do sleep 0.5; alive_http && break; done
