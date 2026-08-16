@@ -135,7 +135,10 @@ export async function stateJson() {
   const me = await identity();
   const pairs = [];
   for (const id of await listPairs()) {
+    // 壊れた縁が1件あっても画面全体を落とさない（device_idを欠く peer.json で500になった
+    // 2026-08-16の検証）。読めない・形が違うものは黙って飛ばす。
     let peer; try { peer = await readPeer(id); } catch { continue; }
+    if (!peer || typeof peer.device_id !== 'string' || peer.device_id.length < 8) continue;
     const visible = !!peer.show_presence; // デフォルトは隠す（ステルス）
     if (visible) await beat({ relayDir: RELAY, pairId: id, myDeviceId: me.device_id, nowIso: now() });
     const reach = await reachOf({ relayDir: RELAY, pairId: id, peerDeviceId: peer.device_id, nowIso: now() });
@@ -186,7 +189,10 @@ export async function inboxJson() {
   const me = await identity();
   const items = [];
   for (const id of await listPairs()) {
+    // 壊れた縁が1件あっても画面全体を落とさない（device_idを欠く peer.json で500になった
+    // 2026-08-16の検証）。読めない・形が違うものは黙って飛ばす。
     let peer; try { peer = await readPeer(id); } catch { continue; }
+    if (!peer || typeof peer.device_id !== 'string' || peer.device_id.length < 8) continue;
     screenPair(id, peer.device_id);
     const sc = await readScreen(id);
     const tri = await readTriage(id);
