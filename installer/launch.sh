@@ -10,7 +10,16 @@ exec >>"$LOG" 2>&1
 echo "=== bump launch $(date) ==="
 
 # DEST は専用ランタイム（開発リポ ~/bump とは絶対に別。上書き事故を防ぐ）。
-HERE="$(cd "$(dirname "$0")/../Resources/repo" && pwd)"
+# BUMP_STUB_API=1  ← stubがこの名札を見て「渡してよい本体か」を判断する。
+# 名札が無い古い本体に渡すと、HEREの求め方が違って空になり rsync "/" を撃つ（2026-08-16の実測）。
+# 同梱コードの場所。stub から渡される（stub経由でない直接実行にも耐えるようフォールバック）。
+HERE="${BUMP_BUNDLE_REPO:-}"
+[ -n "$HERE" ] || HERE="$(cd "$(dirname "$0")/../Resources/repo" 2>/dev/null && pwd || true)"
+[ -n "$HERE" ] || HERE="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd || true)"
+# HEREが不正なまま進むと rsync の転送元が壊れる。ここで必ず止める。
+if [ -z "$HERE" ] || [ ! -f "$HERE/bin/bump.js" ]; then
+  echo "FATAL: 同梱コードの場所を特定できません（HERE=${HERE:-空}）。中止します。"; exit 1
+fi
 DEST="$HOME/.bump-app"
 MIDHOME="$HOME/.bump"; HUB="$HOME/.bump-hub"; RELAY="$HUB/relay"
 NODE="$(command -v node || true)"

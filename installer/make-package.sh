@@ -27,7 +27,7 @@ SLUG="$(printf '%s' "$LABEL" | tr ' /:*?"<>|' '_________')"  # ファイル名�
 APP="$ROOT/dist/bump-$SLUG.app"
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources/repo"
 
-cp installer/launch.sh "$APP/Contents/MacOS/bump"; chmod +x "$APP/Contents/MacOS/bump"
+cp installer/stub.sh "$APP/Contents/MacOS/bump"   # 薄い起動口。本体は導入先の installer/launch.sh; chmod +x "$APP/Contents/MacOS/bump"
 cp installer/Info.plist "$APP/Contents/Info.plist"
 cp installer/bump.icns "$APP/Contents/Resources/bump.icns" 2>/dev/null || true
 
