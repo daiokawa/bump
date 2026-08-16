@@ -13,4 +13,9 @@ export BUMP_BUNDLE_REPO="$HERE"
 if [ -x "$DEST/installer/launch.sh" ] && grep -q "BUMP_STUB_API=1" "$DEST/installer/launch.sh" 2>/dev/null; then
   exec /bin/bash "$DEST/installer/launch.sh" "$@"
 fi
-exec /bin/bash "$HERE/installer/launch.sh" "$@"
+# 同梱側が使えるならそれ（初回・通常）。無い場合の最後の砦として導入先の既存本体を使う
+# （名札の無い旧版でも起動だけはできるように。Y.Kz.提案 2026-08-16）。
+if [ -f "$HERE/installer/launch.sh" ]; then exec /bin/bash "$HERE/installer/launch.sh" "$@"; fi
+if [ -x "$DEST/installer/launch.sh" ]; then exec /bin/bash "$DEST/installer/launch.sh" "$@"; fi
+echo "FATAL: bump 本体が見つかりません: ${HERE} / ${DEST}. パッケージを取り直してください。" >&2
+exit 1

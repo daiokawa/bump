@@ -4,6 +4,15 @@ This log exists to show how bump is built: bugs are recorded, credited, and fixe
 Reporter initials refer to the testers in the README acknowledgments. Entries that would
 endanger current users are withheld until fixed — nothing here is, by policy.
 
+## 2026-08-16 — security audit day
+
+- **Cross-site requests can no longer reach the console.** A malicious page open in your browser could POST to bump on 127.0.0.1 and delete letters and audit logs, send letters as you, or rewrite your profile. Reported with a working exploit by K.K. after reading the whole codebase; reproduced here (worse than reported — the request succeeded, not just reached the handler). Mutating requests now require a same-origin signal.
+- **Release signing.** Apple's notarization covers the `.app` you double-click, not the code auto-update later overlays from GitHub. Raised by Y.K. (scope of the seal) and deepened by K.K. from an attacker's angle: an account takeover would ship to every tester at once. Distributed code now carries an Ed25519 signature over its content hash; auto-update refuses anything that does not verify against the public key already on your machine. Anyone can check with `bump verify-release`.
+- **The updater can now update itself.** The app entry became a thin stub so that `installer/launch.sh` — the thing that performs updates and now checks signatures — rides auto-update like everything else.
+- Old-name launchd agents are swept on every open (K.K.); a migration-time crash used to skip that cleanup permanently.
+- Quick replies keep their pressed state per letter, so you can tell whether you already answered.
+- Fixed a shell bug class where a multibyte character next to a variable killed the installer under `set -u` (Y.Kz., second occurrence) — and added a pre-ship lint that refuses to build if any script contains the pattern.
+
 ## 2026-08-14 — public release day
 
 - Published at github.com/daiokawa/bump (MIT). App packages signed and notarized.

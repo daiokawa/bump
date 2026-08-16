@@ -33,7 +33,7 @@ cp installer/bump.icns "$APP/Contents/Resources/bump.icns" 2>/dev/null || true
 
 # リポ一式（node_modules 同梱＝相手側 npm 不要）。scratch は除外。
 rsync -a --exclude .git --exclude /dist --exclude '*.log' --exclude .playwright-mcp \
-  --exclude '/*.png' --exclude installer --exclude relaybox \
+  --exclude '/*.png' --exclude installer/relay-url.local --exclude relaybox \
   "$ROOT/" "$APP/Contents/Resources/repo/"
 
 # ★焼き込み：relay住所（配布者の受信箱）＋宛先ラベル（系統）＋合言葉（本人確認）
