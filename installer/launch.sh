@@ -177,6 +177,11 @@ OWNER_BUNDLE="$DEST/owner-bundle.json"; OWNER_NAME="$(cat "$DEST/owner-name" 2>/
 # 既にその相手と縁がある（＝更新で開いた既存ユーザー）なら申請は送らない。
 OWNER_DEV="$("$NODE" -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).device_id)}catch(e){}' "$OWNER_BUNDLE" 2>/dev/null)"
 if [ -n "$OWNER_DEV" ] && grep -qs "$OWNER_DEV" "$MIDHOME"/pairs/*/peer.json; then : > "$HUB/requested"; fi
+# BUMP_NO_CONNECT=1 なら申請を出さない。検証で本物の中継へ申請が飛び、配る側の画面に
+# テスト用の接続リクエストが並んだ（2026-08-16。実物で起動確認するようにした副作用）。
+if [ -n "${BUMP_NO_CONNECT:-}" ]; then
+  : > "$HUB/requested"; echo "connect request: 検証モードのため送りません"
+fi
 if [ -s "$OWNER_BUNDLE" ] && [ ! -f "$HUB/requested" ]; then
   NAME="$(cat "$DEST/recipient.txt" 2>/dev/null || echo "")"
   if "$NODE" bin/bump.js request "$OWNER_NAME" --bundle "$OWNER_BUNDLE" --name "$NAME"; then
