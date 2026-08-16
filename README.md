@@ -46,10 +46,15 @@ Honesty about limits beats confidence about strengths.
 ## Run
 
 ```sh
+npm ci --omit=dev   # not `npm install` — see below
 bash up.sh          # relay (8791) + console (8790) + notifications
 bash open-app.sh    # open the console window
 bash up.sh stop
 ```
+
+Use `npm ci`, not `npm install`. The latter rewrites `package-lock.json`, which is part of
+the signed content, so `bump verify-release` will then correctly report a mismatch (H.S.,
+who hit exactly this on the way in).
 
 Requirements: Node.js 20+, a local AI (Claude Code / Codex CLI / any MCP client). Tailscale is needed **only by the person publishing a relay**. Ports bind to 127.0.0.1 only. No sudo, ever.
 
