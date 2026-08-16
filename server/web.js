@@ -93,7 +93,10 @@ const server = createServer(async (req, res) => {
   try {
     // 状態を変える要求は同一オリジンのみ（上のsameOriginOnlyの説明を参照）
     if (req.method !== 'GET' && req.method !== 'HEAD' && !sameOriginOnly(req)) {
-      warn('遮断', new Error(`cross-site ${req.method} ${url.pathname} from ${req.headers.origin || 'unknown'}`));
+      // 標準出力にだけ残す。「うまくいかなかったこと」の一覧には出さない ── あそこは
+      // 「相手に届いていない可能性がある」ものを見せる場所で、防御の成功を混ぜると
+      // 人が「何か失敗した」と受け取る（大川さん 2026-08-16・実際にそう見えた）。
+      console.log(`[blocked] cross-site ${req.method} ${url.pathname} from ${req.headers.origin || 'unknown'}`);
       return json(res, 403, { error: 'cross-site request blocked' });
     }
     if (url.pathname === '/') {
