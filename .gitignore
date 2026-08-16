@@ -18,3 +18,4 @@ relay-url.default
 .playwright-mcp/
 .DS_Store
 mm-*.png
+release-key.json

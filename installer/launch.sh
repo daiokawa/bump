@@ -27,12 +27,21 @@ ask(){ [ -n "$NONI" ] && { echo ""; return; }; osascript -e "text returned of (d
 
 # 0.5) 自動更新: GitHubの最新を取れたら、それを導入元に重ねる（人がアプリを開いた時だけ動く）。
 # 取れない環境（オフライン・git無し）は同梱版で進む＝更新は付加であって前提ではない。
+DEST_SRC="$HERE"   # 検証に使うのは常に同梱側（降ってきた側を信じない）
 UPDATED_SHA=""
 if command -v git >/dev/null 2>&1 && git ls-remote --heads https://github.com/daiokawa/bump.git >/dev/null 2>&1; then
   rm -rf "$HOME/.bump-latest"
   if git clone -q --depth 1 https://github.com/daiokawa/bump.git "$HOME/.bump-latest" 2>/dev/null; then
-    UPDATED_SHA="$(cd "$HOME/.bump-latest" && git rev-parse --short HEAD)"
-    echo "auto-update: GitHubの最新を取得 ($UPDATED_SHA)"
+    # 署名検証（K.K.の監査 2026-08-16）。降ってきたコードは、いま動いている側に同梱された
+    # 公開鍵で検証してから取り込む。通らなければ同梱版のまま進む＝GitHubが乗っ取られても
+    # 全員へ同時配布される経路にならない。検証コードと鍵は降ってきた側のものを使わない。
+    if "$NODE" "$DEST_SRC/bin/bump.js" verify-release "$HOME/.bump-latest" >/dev/null 2>&1; then
+      UPDATED_SHA="$(cd "$HOME/.bump-latest" && git rev-parse --short HEAD)"
+      echo "auto-update: 署名を確認して取得 ($UPDATED_SHA)"
+    else
+      echo "auto-update: 署名を確認できないので取り込みません（同梱版で起動します）"
+      rm -rf "$HOME/.bump-latest"
+    fi
   fi
 fi
 

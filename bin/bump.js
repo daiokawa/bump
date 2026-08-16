@@ -23,7 +23,7 @@
 //
 // 1マシンに2エンドを立てる時は BUMP_HOME=~/.mm-a / ~/.mm-b で分ける。
 
-import { mkdir, readFile, rename, copyFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, copyFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { root, identityPath, pairPaths } from '../lib/paths.js';
@@ -89,6 +89,41 @@ async function cmdVersion() {
     (e, so) => res(e ? '' : so.trim())));
   const line = await git(['log', '-1', '--format=%ad %h %s', '--date=short']);
   out(line ? tf('Repository version: {line}', { line }) : t('No version info (no build.txt and no git)'));
+}
+
+// リリース署名の発行（配る側・秘密鍵は ~/.bump/release-key.json にオフライン保管）。
+async function cmdSignRelease() {
+  const { treeHash, signTree } = await import('../lib/release.js');
+  const keyPath = join(root(), 'release-key.json');
+  let key; try { key = await readJson(keyPath); }
+  catch { die(`署名鍵がありません: ${keyPath}（\`bump init-release-key\` で作成）`); }
+  const dir = join(__dir, '..');
+  const man = signTree({ tree: await treeHash(dir), at: now(), privB64: key.priv });
+  await writeJson(join(dir, 'RELEASE.sig'), man);
+  out(`署名しました: tree ${man.tree.slice(0, 12)}（RELEASE.sig を commit して push）`);
+}
+
+// 署名鍵の作成（初回のみ）。公開鍵は配布物へ、秘密鍵は手元だけ。
+async function cmdInitReleaseKey() {
+  const { generateKeyPairSync } = await import('node:crypto');
+  const keyPath = join(root(), 'release-key.json');
+  let exists = false; try { await readJson(keyPath); exists = true; } catch {}
+  if (exists) die('既に署名鍵があります（上書きしません）');
+  const { publicKey, privateKey } = generateKeyPairSync('ed25519');
+  const pub = publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
+  const priv = privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64');
+  await writeJson(keyPath, { pub, priv, created_at: now() });
+  await writeFile(join(__dir, '..', 'release-pubkey.txt'), pub + '\n');
+  out(`署名鍵を作成: ${keyPath}（バックアップし、リポジトリには入れない）`);
+  out('公開鍵 release-pubkey.txt を commit して配布物に同梱してください。');
+}
+
+// 受け取った側の検証（誰でも打てる）。引数なしなら自分自身を検証。
+async function cmdVerifyRelease(dir) {
+  const { verifyReleaseDir } = await import('../lib/release.js');
+  const r = await verifyReleaseDir(dir || join(__dir, '..'), join(__dir, '..', 'release-pubkey.txt'));
+  if (r.ok) out(`署名OK: ${r.tree.slice(0, 12)} は本家の鍵で署名された中身と一致します`);
+  else { out(`署名を確認できません: ${r.reason}`); process.exit(1); }
 }
 
 // 専用パッケージに焼き込む合言葉を1つ発行する（配る側。make-package.sh が呼ぶ）。
@@ -487,6 +522,9 @@ async function main() {
     case 'id': return cmdId();
     case 'device': return cmdDevice();
     case 'version': return cmdVersion();
+    case 'sign-release': return cmdSignRelease();
+    case 'init-release-key': return cmdInitReleaseKey();
+    case 'verify-release': return cmdVerifyRelease(rest[0]);
     case 'invite': return cmdInvite(rest[0], flags);
     case 'engage': return cmdEngage(rest[0], flags);
     case 'request': return cmdRequest(rest[0], flags);
