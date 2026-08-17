@@ -4,6 +4,12 @@ This log exists to show how bump is built: bugs are recorded, credited, and fixe
 Reporter initials refer to the testers in the README acknowledgments. Entries that would
 endanger current users are withheld until fixed — nothing here is, by policy.
 
+## 2026-08-17
+
+- Blocked cross-site requests no longer appear in the "what went wrong" panel. A successful defense was being listed next to delivery failures, which reads as something broken.
+- Verification builds no longer send a real connection request to the distributor's console (`BUMP_NO_CONNECT`). Testing the shipped package end to end had the side effect of five test requests landing in the maintainer's inbox.
+- README: use `npm ci`, not `npm install` — the latter rewrites the lockfile, which is signed content, so `verify-release` then reports a mismatch (H.S. hit this while migrating).
+
 ## 2026-08-16 — security audit day
 
 - **Cross-site requests can no longer reach the console.** A malicious page open in your browser could POST to bump on 127.0.0.1 and delete letters and audit logs, send letters as you, or rewrite your profile. Reported with a working exploit by K.K. after reading the whole codebase; reproduced here (worse than reported — the request succeeded, not just reached the handler). Mutating requests now require a same-origin signal.
