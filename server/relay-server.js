@@ -39,7 +39,18 @@ const seqOf = (f) => parseInt(f.slice(0, 12), 10);
 const idOf = (f) => { const i = f.indexOf('__'); return i >= 0 ? f.slice(i + 2, f.length - 5) : ''; };
 const ridDir = (rid) => join(BOX, rid);
 
-async function listFiles(rid) { try { return (await readdir(ridDir(rid))).filter((f) => f.endsWith('.json')); } catch { return []; } }
+async function listFiles(rid) { try { return (await readdir(ridDir(rid))).filter((f) => /^\d{12}__/.test(f) && f.endsWith('.json')); } catch { return []; } }
+
+// seqを封筒ファイル名だけから採ると、TTLで箱が空になった瞬間に1へ巻き戻る。
+// 受信側のcursorは先に進んだままなので、以後の配達が黙って全部落ちる
+// （Y.K.宛で実発生 2026-08-12。1週間、手紙も受領も届いていなかった）。
+// 発行済み番号を seq ファイル（拡張子なし＝封筒一覧に混ざらず、sweepにも消されない）に持ち、決して巻き戻さない。
+const seqStatePath = (rid) => join(ridDir(rid), 'seq');
+async function lastSeqOf(rid, files) {
+  let n = 0;
+  try { n = parseInt(await readFile(seqStatePath(rid), 'utf8'), 10) || 0; } catch {}
+  return files.reduce((m, f) => Math.max(m, seqOf(f)), n);
+}
 
 // TTL・件数超過の掃除（ディスク）。
 async function sweep(rid) {
@@ -90,8 +101,9 @@ const server = createServer(async (req, res) => {
       const eid = safeId(env.envelope_id);
       const dup = files.find((f) => idOf(f) === eid);
       if (dup) return json(res, 200, { ok: true, seq: seqOf(dup), dup: true }); // 冪等
-      const seq = files.reduce((m, f) => Math.max(m, seqOf(f)), 0) + 1;         // ディスク連番
+      const seq = (await lastSeqOf(rid, files)) + 1;                            // ディスク連番（巻き戻し禁止）
       await writeFile(join(dir, `${pad(seq)}__${eid}.json`), JSON.stringify(env), 'utf8');
+      await writeFile(seqStatePath(rid), String(seq), 'utf8');
       await sweep(rid);
       return json(res, 200, { ok: true, seq });
     }
