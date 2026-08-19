@@ -15,7 +15,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 
 import { identityPath, pairPaths } from '../lib/paths.js';
 import { listPairs, readPeer, readJson, writeJson } from '../lib/store.js';
-import { sendMessage, receiveInbox, CONTROL_TYPES } from '../lib/exchange.js';
+import { sendMessage, receiveInbox, sendReceipt, receiptsEnabled, CONTROL_TYPES } from '../lib/exchange.js';
 import { pushToRelay, pullFromRelay } from '../lib/relay.js';
 import { reachOf } from '../lib/presence.js';
 import { screen } from '../lib/guard.js';
@@ -100,6 +100,19 @@ async function toolRead({ pair, limit = 10 }) {
   if (changed) await writeJson(screenPath(pair), sc);
   // 読んだ相手メッセージは既読に（unreadが減る）。
   await writeJson(seenPath(pair), msgs.map((m) => m.id));
+  // AIが読んだ＝既読。画面の開封と同じ帳簿(opened.json)に載せ、まだの分だけ受領(read)を相手へ返す。
+  // 既読の意味は「この縁の誰か（人でもAIでも）が本文を読んだ」。画面でしか受領が出ないと、
+  // AI経由で読む相手の履歴では手紙が永遠に「未読」に見え、「届いていない」と誤読される（Y.K.報告 2026-08-19）。
+  const opened = await openedOf(pair);
+  const fresh = msgs.filter((m) => !CONTROL_TYPES.includes(m.type) && !opened.has(m.id));
+  if (fresh.length) {
+    if (receiptsEnabled(peer)) {
+      for (const m of fresh) await sendReceipt({ identity: me, peer, pairId: pair, re: m.id, status: 'read', now });
+      // 受領の投函失敗はここでは握らない（常駐が未送封筒を投函し直す）。
+      await pushToRelay({ pairId: pair, relayDir: RELAY, peerDeviceId: peer.device_id }).catch(() => {});
+    }
+    await writeJson(join(pairPaths(pair).base, 'opened.json'), [...opened, ...fresh.map((m) => m.id)]);
+  }
   const recent = msgs.slice(-limit).map((m) => ({
     from: 'peer', at: m.created_at, text: m.body,
     suspicious: sc[m.id]?.flag ? { reason: sc[m.id].reason } : false,
