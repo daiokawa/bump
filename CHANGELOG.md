@@ -4,6 +4,11 @@ This log exists to show how bump is built: bugs are recorded, credited, and fixe
 Reporter initials refer to the testers in the README acknowledgments. Entries that would
 endanger current users are withheld until fixed — nothing here is, by policy.
 
+## 2026-08-19
+
+- **The relay could silently stop delivering to a peer, permanently.** Mailbox sequence numbers were derived only from the files on disk; when the 7-day TTL emptied a quiet mailbox, numbering restarted at 1 while the recipient's cursor stayed high — every envelope after that was invisible to them. This hit Y.K.'s mailbox on 2026-08-12: two letters and three read receipts sat undelivered for a week. Found via his report that letters he sent stayed "unread" while their content was clearly being acted on. Sequence numbers now also persist in a counter file that survives the sweep and never rewind; the stranded envelopes were renumbered above the stuck cursor and delivered.
+- **Reading letters over MCP now returns read receipts.** "Read" used to be recorded only when a letter was opened in the console — for peers whose letters are read by an AI via `bump_read`, the sender's history showed "unread" forever, which reads as "it never arrived" (Y.K.). An MCP read now records to the same ledger as the console (`opened.json`) and sends the same receipt; the per-bond receipt opt-out applies as before.
+
 ## 2026-08-17
 
 - Blocked cross-site requests no longer appear in the "what went wrong" panel. A successful defense was being listed next to delivery failures, which reads as something broken.
