@@ -118,7 +118,11 @@ const server = createServer(async (req, res) => {
       const items = [];
       for (const x of picked) { try { items.push({ seq: x.seq, envelope: JSON.parse(await readFile(join(ridDir(rid), x.f), 'utf8')) }); } catch {} }
       const cursor = picked.length ? picked[picked.length - 1].seq : after;
-      return json(res, 200, { items, cursor });
+      // max＝この受信箱でこれまでに発行した最大番号。受け取る側が「自分のcursorがmaxより
+      // 先にいる」＝巻き戻りが起きたと自分で気づけるようにする。気づけないと、空の応答を
+      // 受け取り続けて黙って配達が止まる（2026-08-12の事故がまさにこれ）。
+      const max = await lastSeqOf(rid, await listFiles(rid));
+      return json(res, 200, { items, cursor, max });
     }
     return json(res, 404, { error: 'not found' });
   } catch (e) {
