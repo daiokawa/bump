@@ -19,11 +19,28 @@ import { sendMessage, receiveInbox, sendReceipt, receiptsEnabled, CONTROL_TYPES 
 import { pushToRelay, pullFromRelay } from '../lib/relay.js';
 import { reachOf } from '../lib/presence.js';
 import { screen } from '../lib/guard.js';
-import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readdir, readFile } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __dir = dirname(fileURLToPath(import.meta.url));
 const RELAY = process.env.MM_RELAY || (process.env.BUMP_HOME
   ? join(process.env.BUMP_HOME, '..', 'relay') : '/tmp/mm-demo/relay');
+
+// 更新はアプリを開いた時に入るが、その時点で既に起動していたMCPプロセスは旧コードのまま
+// 生き残る（プロセスの入れ替えはこちらから出来ない）。旧プロセスは修正前の不具合を抱えた
+// まま静かに壊れる（K.S.報告 2026-08-19: r2026-08-19適用後も旧MCPが fetch failed を返し続け、
+// セッションを開き直すまで原因が見えなかった）。せめて自分が古いことを毎応答で名乗る。
+const buildStamp = () => readFile(join(__dir, '..', 'build.txt'), 'utf8')
+  .then((s) => s.trim()).catch(() => '');
+const BOOT_BUILD = await buildStamp();
+async function updateNotice() {
+  const cur = await buildStamp();
+  if (cur && cur !== BOOT_BUILD) {
+    return `bump was updated (now: ${cur}) after this MCP process started — you are still on the old code. Restart your Claude session to load the new version.`;
+  }
+  return null;
+}
 const now = () => new Date().toISOString();
 const identity = () => readJson(identityPath());
 
@@ -149,9 +166,13 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     else if (name === 'bump_send') result = await toolSend(args || {});
     else if (name === 'bump_read') result = await toolRead(args || {});
     else throw new Error(`unknown tool: ${name}`);
+    const stale = await updateNotice().catch(() => null);
+    if (stale && result && typeof result === 'object') result.update_notice = stale;
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   } catch (err) {
-    return { isError: true, content: [{ type: 'text', text: `Error: ${err.message}` }] };
+    // エラー時こそ名乗りが要る（旧コード起因のエラーを新コードの不具合と誤読させない）。
+    const stale = await updateNotice().catch(() => null);
+    return { isError: true, content: [{ type: 'text', text: `Error: ${err.message}${stale ? `\n${stale}` : ''}` }] };
   }
 });
 
