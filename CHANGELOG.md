@@ -4,6 +4,11 @@ This log exists to show how bump is built: bugs are recorded, credited, and fixe
 Reporter initials refer to the testers in the README acknowledgments. Entries that would
 endanger current users are withheld until fixed — nothing here is, by policy.
 
+## 2026-08-20
+
+- **Receivers now recover from a relay mailbox rollback on their own.** The 2026-08-19 fix stopped mailboxes from rewinding, but a receiver whose cursor was already ahead of a rewound mailbox would still wait forever. `/get` now reports the mailbox's highest sequence number; when a receiver's cursor is beyond it, it treats the mailbox as rolled back and re-reads from the start — already-delivered letters are dropped by the duplicate check, so nothing arrives twice. This closes the last known path of the Y.K. incident from the receiving side.
+- **A stale MCP process now says so.** An update is applied when you open the app, but an MCP process started before that keeps running the old code and fails in confusing ways — K.S. saw `fetch failed` from `bump_read` with no hint of the cause until the session was reopened. Every MCP response (including errors) now carries a notice when the installed version no longer matches the code the process started with: restart your Claude session to load the new version.
+
 ## 2026-08-19
 
 - **The relay could silently stop delivering to a peer, permanently.** Mailbox sequence numbers were derived only from the files on disk; when the 7-day TTL emptied a quiet mailbox, numbering restarted at 1 while the recipient's cursor stayed high — every envelope after that was invisible to them. This hit Y.K.'s mailbox on 2026-08-12: two letters and three read receipts sat undelivered for a week. Found via his report that letters he sent stayed "unread" while their content was clearly being acted on. Sequence numbers now also persist in a counter file that survives the sweep and never rewind; the stranded envelopes were renumbered above the stuck cursor and delivered.
