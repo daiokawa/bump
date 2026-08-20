@@ -98,7 +98,25 @@ async function cmdSignRelease() {
   let key; try { key = await readJson(keyPath); }
   catch { die(`署名鍵がありません: ${keyPath}（\`bump init-release-key\` で作成）`); }
   const dir = join(__dir, '..');
-  const man = signTree({ tree: await treeHash(dir), at: now(), privB64: key.priv });
+  const tree = await treeHash(dir);
+  // 署名は「テスターが clone して手にする中身」に対して行う。手元にしか無いファイル
+  // （gitignore済みでSKIP漏れ＝git statusに出ない）が混ざると、手元の検証は通るのに
+  // 配布先では全滅し、しかも同梱版へ巻き戻す（2026-08-20 実発生: .claude/ が署名に混入。
+  // K.S.が対照実験と樹ハッシュ照合で署名側と特定）。git HEAD のクリーンな書き出しと
+  // 突き合わせ、一致しない限り署名させない。
+  {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const { mkdtemp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const t = await mkdtemp(join(tmpdir(), 'bump-sign-'));
+    try {
+      await promisify(execFile)('sh', ['-c', `git -C "${dir}" archive HEAD | tar -x -C "${t}"`]);
+      const clean = await treeHash(t);
+      if (clean !== tree) die(`署名を中止しました: 手元のツリー(${tree.slice(0, 12)})が git HEAD のクリーンな中身(${clean.slice(0, 12)})と一致しません。未コミットの変更か、SKIPに無いローカルファイルが混ざっています（git status --ignored --short で確認）。`);
+    } finally { await rm(t, { recursive: true, force: true }); }
+  }
+  const man = signTree({ tree, at: now(), privB64: key.priv });
   await writeJson(join(dir, 'RELEASE.sig'), man);
   out(`署名しました: tree ${man.tree.slice(0, 12)}（RELEASE.sig を commit して push）`);
 }
