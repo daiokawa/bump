@@ -4,6 +4,11 @@ This log exists to show how bump is built: bugs are recorded, credited, and fixe
 Reporter initials refer to the testers in the README acknowledgments. Entries that would
 endanger current users are withheld until fixed — nothing here is, by policy.
 
+## 2026-08-21
+
+- **The rollback self-heal now also covers the console pull path.** Yesterday's fix said "both pull paths" — in fact it patched the per-bond and connect-request paths but missed `pullAllFromRelay`, the combined path the console and dashboard use, which would still have stalled silently on a rolled-back mailbox. The commit message claimed coverage the code didn't have; found while preparing the change below.
+- **Re-pulled envelopes are no longer re-placed or re-counted.** A rollback recovery re-fetches envelopes you already have. Letters were never doubled (the message-level check catches them), but the envelopes were rewritten into the inbox, decrypted again, and counted — visible as an inflated `pulled N` in `bump sync`. Raised by K.S. while reviewing the self-heal. Envelopes already present, including processed ones, are now skipped at placement.
+
 ## 2026-08-20
 
 - **The morning release shipped with a bad signature — auto-update refused it and rolled installs back to the app-bundled version.** The signing step hashes the working directory, which contained a local scheduler file (under `.claude/`, gitignored, so invisible to `git status`) that no clone has: the maintainer's own verify passed while every tester's failed. Worse, a failed verify restores the bundled version, so opening the app during the bad window *downgraded* the install (K.S. went 08-19 → 08-16). Caught within two hours by K.S. with a control experiment (r2026-08-19 verified fine, same key, same steps) and per-commit tree-hash comparison that pinned the mismatch to the signing side. Fixed twice over: `.claude` is now excluded from both signature and package, and `sign-release` refuses to sign at all unless the working tree hashes identically to a clean export of git HEAD — a signature that only verifies on the maintainer's machine can no longer be produced. If you opened the app during the bad window, open it again to get current. Also queued: a failed verify should fall back to the newest version that ever verified, not all the way to the bundled one.
