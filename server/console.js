@@ -65,7 +65,9 @@ function jumpTo(it){
 // 直近の失敗があれば、ロゴ横に小さく出す。押すと中身を見られる。
 let lastWarnCount=0;
 async function refreshHealth(){
-  let w=[];try{w=(await (await fetch('/api/health')).json()).warnings||[];}catch{return;}
+  let h=null;try{h=await (await fetch('/api/health')).json();}catch{return;}
+  renderStale(h.stale_mcp);
+  const w=h.warnings||[];
   const b=$('warnBtn');
   if(!w.length){b.style.display='none';lastWarnCount=0;return;}
   b.style.display='';b.textContent='⚠ '+w.length;lastWarnCount=w.length;
@@ -76,6 +78,25 @@ async function refreshHealth(){
     panel.append(hd,sub);
     const box=el('div','inqlog');
     w.forEach(x=>{const line=el('div','inqline');line.textContent=ts(x.at)+' | '+x.scope+': '+x.message;box.append(line);});
+    panel.append(box);
+    const acts=el('div','cropacts');const c=el('button','btn');c.style.cssText='flex:1;background:#eef2f6;color:#46586a';c.textContent=t('Close');c.onclick=()=>scrim.remove();acts.append(c);panel.append(acts);
+    scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
+  };
+}
+// 旧コードのままのMCP席（更新の適用より前に起動したセッション）。旧プロセス自身の名乗り
+// （mcp.jsのupdate_notice）は機能が入る前のプロセスには届かないので、常に新版で動く
+// この画面が数えて知らせる（K.S.指摘 2026-08-22）。
+function renderStale(s){
+  const b=$('staleBtn');
+  if(!s||!s.stale||!s.stale.length){b.style.display='none';return;}
+  b.style.display='';b.textContent='⟳ '+s.stale.length;
+  b.onclick=()=>{
+    const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.cssText='max-width:560px;width:min(560px,calc(100vw - 40px))';
+    const hd=el('div','crophd');hd.textContent=tf('{n} session(s) running old code',{n:s.stale.length});
+    const sub=el('div','cropsub');sub.textContent=tf('These MCP processes started before the last update was applied ({when}), so they are still running the old code — too old to even say so themselves. Restart those Claude sessions to load the new version.',{when:ts(s.applied_at)});
+    panel.append(hd,sub);
+    const box=el('div','inqlog');
+    s.stale.forEach(x=>{const line=el('div','inqline');line.textContent=tf('PID {pid} — started {when}',{pid:x.pid,when:ts(x.started_at)});box.append(line);});
     panel.append(box);
     const acts=el('div','cropacts');const c=el('button','btn');c.style.cssText='flex:1;background:#eef2f6;color:#46586a';c.textContent=t('Close');c.onclick=()=>scrim.remove();acts.append(c);panel.append(acts);
     scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);

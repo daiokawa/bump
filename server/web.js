@@ -33,6 +33,7 @@ const { listClaudeSessions } = await import('../lib/sessions.js');
 const { tmuxNotify } = await import('../lib/notify.js');
 const { warn, warner, recentWarnings } = await import('../lib/log.js');
 const { freeBytes, hasRoom, humanBytes, MIN_FREE_BYTES } = await import('../lib/disk.js');
+const { staleMcp } = await import('../lib/stale-mcp.js');
 const { receiveConnectRequests, listPending, readPending, dropPending, sendConnectRequest,
   readBlocked, blockDevice, unblockDevice } = await import('../lib/connect.js');
 const { matchInvite, markInviteUsed } = await import('../lib/invite.js');
@@ -41,6 +42,7 @@ const { identity, stateJson, pairJson, inboxJson, letterJson, sentJson,
   markTriage, addInquiry, sanitizeChannels, carryLocalPeer, contactLabel, OPEN_SCHEMES } = await import('./views.js');
 
 const now = () => new Date().toISOString();
+let staleMcpCache = { at: 0, val: null };
 // 常駐サーバは、はぐれた例外1つで落ちてはいけない（操作席が消えるのは最悪）。ログして生き延びる。
 process.on('unhandledRejection', (e) => { try { console.error('unhandledRejection:', e && e.message); } catch {} });
 
@@ -304,8 +306,12 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/api/health') {
       const free = await freeBytes();
+      // 旧コード席の検知は ps を叩くので、画面の3秒ポーリングに直結させず30秒キャッシュ
+      if (Date.now() - staleMcpCache.at > 30000)
+        staleMcpCache = { at: Date.now(), val: await staleMcp().catch(() => null) };
       return json(res, 200, { warnings: recentWarnings(20),
-        disk: { free, freeText: humanBytes(free), min: MIN_FREE_BYTES, ok: free === null ? true : free >= MIN_FREE_BYTES } });
+        disk: { free, freeText: humanBytes(free), min: MIN_FREE_BYTES, ok: free === null ? true : free >= MIN_FREE_BYTES },
+        stale_mcp: staleMcpCache.val });
     }
     if (url.pathname === '/api/state') return json(res, 200, await stateJson());
     if (url.pathname === '/api/pair') return json(res, 200, await pairJson(url.searchParams.get('id'),

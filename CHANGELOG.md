@@ -4,6 +4,10 @@ This log exists to show how bump is built: bugs are recorded, credited, and fixe
 Reporter initials refer to the testers in the README acknowledgments. Entries that would
 endanger current users are withheld until fixed — nothing here is, by policy.
 
+## 2026-08-22
+
+- **Sessions too old to announce themselves are now counted from the new side.** The 08-20 stale-process notice only works if the old process itself carries the feature — an MCP process started before 08-20 can never say so, and those long-lived sessions are exactly the layer the notice was built to protect. Spotted by K.S. from live measurement: 3 of the 6 MCP processes on his machine were in that blind spot, and the longer a session stays open the older its code — the wrong way around. The console, which always runs current code, now checks `ps` for MCP processes of this install that started before the last update was applied (the `build.txt` timestamp; no new bookkeeping) and shows "N sessions running old code" with a restart hint. The in-band notice stays — it is the only channel that reaches the affected Claude directly — this covers the layer it structurally cannot, and closes the same gap for any future feature.
+
 ## 2026-08-21
 
 - **The rollback self-heal now also covers the console pull path.** Yesterday's fix said "both pull paths" — in fact it patched the per-bond and connect-request paths but missed `pullAllFromRelay`, the combined path the console and dashboard use, which would still have stalled silently on a rolled-back mailbox. The commit message claimed coverage the code didn't have; found while preparing the change below.
