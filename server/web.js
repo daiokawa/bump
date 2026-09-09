@@ -25,7 +25,7 @@ import QRCode from 'qrcode';
 const { readPeer, readJson, ensurePair, writePeer, logEvent, listPairs } = await import('../lib/store.js');
 const { pairPaths } = await import('../lib/paths.js');
 const { engagePeer } = await import('../lib/pairing.js');
-const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage } = await import('../lib/exchange.js');
+const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage, unsendMessage } = await import('../lib/exchange.js');
 const { buildPackage, listPackages, discardPackage, MAX_PAYLOAD_BYTES } = await import('../lib/package.js');
 const { pushToRelay } = await import('../lib/relay.js');
 const { signedBundle, verifyBundle } = await import('../lib/crypto.js');
@@ -371,6 +371,14 @@ const server = createServer(async (req, res) => {
       try { await pushToRelay({ pairId: b.id, relayDir: RELAY, peerDeviceId: peer.device_id }); }
       catch (e) { delivered = false; warn(tf('delivery ({pair})', { pair: b.id }), e); }
       return json(res, 200, { sent: msg.id, delivered });
+    }
+    // 送信取り消し（配達前のみ）。中継にまだ在れば消える。相手にpull済みなら removed:false。
+    if (url.pathname === '/api/unsend' && req.method === 'POST') {
+      const b = await body(req);
+      const me = await identity(); const peer = await readPeer(b.id);
+      const r = await unsendMessage({ identity: me, pairId: b.id, messageId: b.msg,
+        relayDir: RELAY, peerDeviceId: peer.device_id, now });
+      return json(res, 200, { removed: r.removed });
     }
     if (url.pathname === '/api/engage' && req.method === 'POST') {
       const b = await body(req);

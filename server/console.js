@@ -218,7 +218,7 @@ function renderList(){
     });
   }else{
     if(!cache.sent.length)return listEmpty(t('Nothing sent yet.'));
-    const label={sent:t('Unread'),read:t('✓ Read'),declined:t('✕ Was declined')};
+    const label={sent:t('Unread'),read:t('✓ Read'),declined:t('✕ Was declined'),unsent:t('↩ Recalled')};
     cache.sent.forEach(m=>{
       const row=el('div','row'+(sel&&sel.id===m.id&&sel.type==='sent'?' sel':''));row.onclick=()=>{sel={type:'sent',...m};renderList();renderMain();};
       const av=avaInto(el('div','ava'),{avatar:m.avatar,icon:m.icon,text:nm(m.pair).slice(0,2).toUpperCase()});av.style.background=color(m.pair);
@@ -387,12 +387,25 @@ async function renderMain(){
     const gear=el('button','pairset');gear.textContent=t('Settings');gear.title=t('Settings for this contact');gear.onclick=()=>openPairSettings(sel.pair,P);
     M.querySelector('.m-head').append(gear);
   }else{
-    M.textContent='';const label={sent:t('Unread'),read:t('✓ Read'),declined:t('✕ Was declined')};
+    M.textContent='';const label={sent:t('Unread'),read:t('✓ Read'),declined:t('✕ Was declined'),unsent:t('↩ Recalled')};
     const av=avaInto(el('div','m-ava'),{avatar:sel.avatar,icon:sel.icon,text:nm(sel.pair).slice(0,2).toUpperCase()});av.style.background=color(sel.pair);
     M.append(mHead(av,tf('To {name}',{name:sel.label||nm(sel.pair)}),ts(sel.at)+' · '+(label[sel.status]||sel.status),undefined,undefined,()=>openProfile(sel.pair)));
     const body=el('div','m-body');const p=el('div','letter');p.textContent=(sel.body||'').replace(/^【[^】]*】/,'');body.append(p);
     if(sel.status==='declined'&&sel.reason){const r=el('div','inqlog');const line=el('div','inqline');line.textContent=tf('From them: {reason}',{reason:sel.reason});r.append(line);body.append(r);}
     M.append(body);
+    // 取り消し＝配達前（中継にまだ在るうち）だけ効く。Unread表示でも相手側に届いて未読の
+    // 可能性はある（既読が来ていないだけ）ので、結果は必ずサーバの返答で示す。
+    if(sel.status==='sent'){
+      const acts=el('div','m-actions');const rb=el('button','btn');rb.style.cssText='background:#eef2f6;color:#46586a';
+      rb.textContent=t('Recall this letter (works only before delivery)');
+      rb.onclick=async()=>{
+        rb.disabled=true;
+        let r=null;try{r=await (await fetch('/api/unsend',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:sel.pair,msg:sel.id})})).json();}catch{}
+        if(r&&r.removed){sel.status='unsent';cache.sent=null;await loadList();renderMain();}
+        else{rb.textContent=t('Could not recall — it already left the relay');}
+      };
+      acts.append(rb);M.append(acts);
+    }
   }
 }
 

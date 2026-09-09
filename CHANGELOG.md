@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-09
+
+- **You can now recall a letter while it still sits undelivered on the relay.** Sometimes a letter becomes moot before the other side reads it — the concrete case: a request letter made obsolete when the conversation moved to another channel, left cluttering the peer's mailbox (raised via K.O.). New `bump_unsend` MCP tool and a "recall" button on sent letters in the console. The honest boundary is delivery, not reading: the relay can only remove what it still holds, so a recall succeeds before the peer's device pulls the envelope and reports failure after — nothing ever reaches into the other side's machine. The blind relay stays blind: it keeps no key registry, but since a device id is the hash of its public key, a recall request carrying the sender's public key and an Ed25519 signature proves "the envelope's sender asked this" without the relay learning who that is. Recalled letters keep their place in your own history, marked ↩. Removing an envelope never touches the mailbox's sequence counter, so this coexists with the rollback protections from 08-19/20.
+
 This log exists to show how bump is built: bugs are recorded, credited, and fixed in the open.
 Reporter initials refer to the testers in the README acknowledgments. Entries that would
 endanger current users are withheld until fixed — nothing here is, by policy.

@@ -15,6 +15,7 @@ import { mkdir, readdir, readFile, writeFile, unlink, stat } from 'node:fs/promi
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
+import { verifyUnsendClaim } from '../lib/crypto.js';
 
 const PORT = Number(process.argv[2]) || 8791;
 const BOX = process.env.MM_RELAYBOX || join(process.env.BUMP_HOME || join(homedir(), '.bump'), 'relaybox');
@@ -50,6 +51,15 @@ async function lastSeqOf(rid, files) {
   let n = 0;
   try { n = parseInt(await readFile(seqStatePath(rid), 'utf8'), 10) || 0; } catch {}
   return files.reduce((m, f) => Math.max(m, seqOf(f)), n);
+}
+
+// どこまで配ったか（served）。/get はカーソル方式で封筒を消さないので、「ファイルが在る」は
+// 「未配達」を意味しない（配達済みでもTTLまで残る）。送信取り消しの可否は配達前/後で
+// 決めたいから、/get で一度でも手渡した最大seqを覚えておく（seqと同じく拡張子なし＝
+// 封筒一覧に混ざらずsweepにも消されない。増えるだけで巻き戻さない）。
+const servedStatePath = (rid) => join(ridDir(rid), 'served');
+async function lastServedOf(rid) {
+  try { return parseInt(await readFile(servedStatePath(rid), 'utf8'), 10) || 0; } catch { return 0; }
 }
 
 // TTL・件数超過の掃除（ディスク）。
@@ -118,11 +128,38 @@ const server = createServer(async (req, res) => {
       const items = [];
       for (const x of picked) { try { items.push({ seq: x.seq, envelope: JSON.parse(await readFile(join(ridDir(rid), x.f), 'utf8')) }); } catch {} }
       const cursor = picked.length ? picked[picked.length - 1].seq : after;
+      // 手渡した事実を記録（応答が途中で落ちても受信側cursorは進まず再取得できる＝
+      // servedは配達を止めない。unsendの可否判定だけに使う。安全側＝渡したかもしれないら渡した扱い）。
+      if (picked.length) {
+        const served = Math.max(await lastServedOf(rid), cursor);
+        await writeFile(servedStatePath(rid), String(served), 'utf8').catch(() => {});
+      }
       // max＝この受信箱でこれまでに発行した最大番号。受け取る側が「自分のcursorがmaxより
       // 先にいる」＝巻き戻りが起きたと自分で気づけるようにする。気づけないと、空の応答を
       // 受け取り続けて黙って配達が止まる（2026-08-12の事故がまさにこれ）。
       const max = await lastSeqOf(rid, await listFiles(rid));
       return json(res, 200, { items, cursor, max });
+    }
+    // 送信取り消し: 差出人本人の署名付き要求で、まだ配達前の封筒を受信箱から取り除く。
+    // 相手が既にpull済みなら何も起きない（removed:false）＝取り消せるのは配達前だけ。
+    // seqファイルは決して触らない（欠番はcursor方式が自然に飛ばす。巻き戻し禁止は不変条件）。
+    if (url.pathname === '/unsend' && req.method === 'POST') {
+      const raw = await readBody(req, 16 * 1024);
+      let p; try { p = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad json' }); }
+      const rid = p.to_routing_id;
+      if (!validRid(rid)) return json(res, 400, { error: 'bad routing_id' });
+      if (!ridRateOk(rid)) return json(res, 429, { error: 'routing rate' });
+      const chk = verifyUnsendClaim(p.claim, new Date().toISOString());
+      if (!chk.ok) return json(res, 400, { error: `bad claim: ${chk.reason}` });
+      const f = (await listFiles(rid)).find((x) => idOf(x) === safeId(chk.envelope_id));
+      if (!f) return json(res, 200, { ok: true, removed: false }); // 失効済みか元々ない（冪等）
+      let env; try { env = JSON.parse(await readFile(join(ridDir(rid), f), 'utf8')); } catch {}
+      if (!env || env.from !== chk.device_id) return json(res, 403, { error: 'not the sender' });
+      // ファイルが在っても、一度でも/getで手渡した封筒は「配達済み」＝取り消せない。
+      // （消しても相手は既に持っている。「取り消せました」と嘘をつく方が実害が大きい）
+      if (seqOf(f) <= (await lastServedOf(rid))) return json(res, 200, { ok: true, removed: false });
+      await unlink(join(ridDir(rid), f)).catch(() => {});
+      return json(res, 200, { ok: true, removed: true });
     }
     return json(res, 404, { error: 'not found' });
   } catch (e) {
