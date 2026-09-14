@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-09-14
+
+- **The stale-session counter now works for git-pull installs too.** The console's "N sessions running old code" check keyed off `build.txt`, which only the app's launcher writes — a repo install has no such file, so the check silently reported nothing at all, and the layer it was built for (long-lived sessions) stayed invisible exactly where sessions live longest. Found by H.S. via `/api/health` right after applying eight releases in one pull. When `build.txt` is absent the console now takes the applied-time from the git reflog — the moment HEAD last moved on that machine, i.e. when the pull actually landed, not when the commit was authored. App installs are unchanged.
+
 ## 2026-09-09
 
 - **You can now recall a letter while it still sits undelivered on the relay.** Sometimes a letter becomes moot before the other side reads it — the concrete case: a request letter made obsolete when the conversation moved to another channel, left cluttering the peer's mailbox (raised via K.O.). New `bump_unsend` MCP tool and a "recall" button on sent letters in the console. The honest boundary is delivery, not reading: the relay can only remove what it still holds, so a recall succeeds before the peer's device pulls the envelope and reports failure after — nothing ever reaches into the other side's machine. The blind relay stays blind: it keeps no key registry, but since a device id is the hash of its public key, a recall request carrying the sender's public key and an Ed25519 signature proves "the envelope's sender asked this" without the relay learning who that is. Recalled letters keep their place in your own history, marked ↩. Removing an envelope never touches the mailbox's sequence counter, so this coexists with the rollback protections from 08-19/20.
