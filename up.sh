@@ -47,7 +47,7 @@ cat <<TXT
 
   配線盤（あなたの接続）:  http://localhost:8790
   あなたのエンド:          ~/.bump
-  相方 codex:              常駐応答中（置き手紙を出すと返します）
+  相方 codex:              縁はあり。自動応答は動いていません（rallyは既定で起動しません）
 
 手元Claudeから使う（MCP）:
   claude mcp add bump -- node $(pwd)/bin/mcp.js

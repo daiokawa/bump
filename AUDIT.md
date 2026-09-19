@@ -65,7 +65,7 @@ grep -rn "execFile\|spawn(" lib server bin | grep -v node_modules
 ## 3. 書き込む場所
 
 ```sh
-grep -rn "writeFile\|mkdir\|appendFile\|rm(" lib server bin | grep -v node_modules
+grep -rn "writeFile\|mkdir\|appendFile\|rm(" lib server bin installer *.sh | grep -v node_modules
 ```
 
 書き込み先は関数経由に統一されています。実体は3つだけです：
@@ -76,12 +76,25 @@ grep -rn "writeFile\|mkdir\|appendFile\|rm(" lib server bin | grep -v node_modul
 | `~/.bump` | あなたの鍵・手紙・設定（`root()` が返す先。`BUMP_HOME` で変更可） |
 | `~/.bump-hub` | 接続先URLの控え |
 
-**それ以外には書きません。** シェルの起動ファイル（`.zshrc` 等）、既存アプリの設定、システム領域には一切触りません。確かめるなら：
+**本体（`lib` `server` `bin`）はそれ以外に書きません。** ただし**導入スクリプト（`installer/`）は別です。** 確かめるなら、本体だけでなく導入側も含めて引いてください：
 
 ```sh
-grep -rn "zshrc\|bash_profile\|LaunchAgents\|/Library/" lib server bin | grep -v node_modules
-# → 何も出ないのが期待される結果
+grep -rn "zshrc\|bash_profile\|LaunchAgents\|Library/Logs\|claude mcp add" lib server bin installer *.sh | grep -v node_modules
 ```
+
+**期待される結果**：5行出ます。実際に何かをするのは下の3行だけで、残り2行は文字列です。
+
+| 出てくる場所 | 何をするか |
+|---|---|
+| `installer/launch.sh:8` | `~/Library/Logs/bump.log` にログを書く |
+| `installer/launch.sh:124` | `claude mcp add -s user bump ...` で手元Claudeに道具を登録する |
+| `installer/launchd/setup-launchd.sh:10` | `~/Library/LaunchAgents` に常駐設定（画面・relay・通知）を置く |
+| `up.sh:53` | 画面に表示する案内文（実行はしない。自分で打つためのコマンド例） |
+| `bin/mcp.js:10` | コメント行 |
+
+上の3つは導入時に一度だけ走るもので、`bash up.sh` では実行されません。シェルの起動ファイル（`.zshrc` 等）には触りません。
+
+> この節の grep は 2026-09-19 まで `lib server bin` だけを見ており、上の3箇所を取りこぼしていました。導入者からの指摘で範囲を広げています。**「何も出ない」を正しい結果として配っていた**ので、それ以前に監査された方は、この版で引き直してください。
 
 ## 4. 開くポート
 
@@ -103,6 +116,18 @@ lsof -nP -iTCP -sTCP:LISTEN | grep -E '8790|8791'
 `server/web.js` の `/api/apply`（あなたが押した時だけ、tmux経由で「外部データ枠」を付けて渡す）。
 
 seed（ソフト配布）も同じで、届いても**展開も実行もしません**（`lib/package.js` の `savePackage` は保存とsha256照合だけ）。
+
+### 例外が1つあります：`rally --serve`
+
+CLIに `rally` というコマンドがあり、`--serve` を付けると**届いた手紙を手元のAIに渡して自動で返信します。**
+「毎回人間が決める」という設計の一線から外れる唯一の口なので、ここに書いておきます。
+
+- **自分で打たない限り動きません。** `init` / `npm ci` / `up.sh` / launchd / 画面 / MCP のどこからも起動されません
+- 確かめるなら：`grep -rn "rally" bin lib server up.sh installer | grep -v i18n`
+- 実在の相手との縁では**使わないことを勧めます**。自分の別マシンや検証用の相手に限ってください
+
+> この節は 2026-09-19 に追加しました。それ以前の AUDIT.md は `rally` に触れておらず、README の
+> 「A human decides, every time」とこのコマンドの併存を説明していませんでした。導入者からの指摘によるものです。
 
 ## 6. 隔離して試す
 
