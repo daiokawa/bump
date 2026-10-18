@@ -34,7 +34,7 @@ import {
   ensurePair, logEvent, readLog, verifyLog, readPeer, writePeer, hasPeer,
   listPairs, listBox, writeJson, readJson, messageExists,
 } from '../lib/store.js';
-import { engagePeer, pairSafetyNumber, pubkeysChanged } from '../lib/pairing.js';
+import { engagePeer, pairSafetyNumber, pubkeysChanged, confirmedBy, markConfirmed } from '../lib/pairing.js';
 import { sendMessage, receiveInbox, CONTROL_TYPES, sendPackage } from '../lib/exchange.js';
 import { buildPackage, listPackages } from '../lib/package.js';
 import { pushToRelay, pullFromRelay } from '../lib/relay.js';
@@ -173,7 +173,7 @@ async function cmdEngage(pairId, flags) {
   await ensurePair(pairId);
   if (await hasPeer(pairId)) {
     const existing = await readPeer(pairId);
-    if (pubkeysChanged(existing, bundle)) die(t('Public keys changed for an existing pair. Re-engage is dangerous; confirm manually (delete peer.json first)'));
+    if (pubkeysChanged(existing, bundle)) die(tf("{name}'s key has changed. If they reinstalled or similar, reconnect with a new package.", { name: tf('{name}', { name: existing.name || pairId }) }));
     out(t('Already engaged with the same public keys. No change'));
     return;
   }
@@ -181,8 +181,7 @@ async function cmdEngage(pairId, flags) {
   peer.engaged_at = now();
   await writePeer(pairId, peer);
   await logEvent(pairId, { type: 'engaged', peer: peer.device_id }, now());
-  out(tf('Pair "{pair}" engaged (unverified)', { pair: pairId }));
-  out(tf('Next: `bump safety {pair}` to compare numbers with your peer, then `bump verify {pair}` if they match', { pair: pairId }));
+  out(tf('Pair "{pair}" engaged', { pair: pairId }));
 }
 
 // 接続申請を出す（新規参加側）。相手のバンドル(招待)を渡すだけ＝相手の画面に「承認」が出る。
@@ -249,12 +248,11 @@ async function cmdSafety(pairId) {
 
 async function cmdVerify(pairId) {
   const peer = await readPeer(pairId);
-  if (peer.verified) { out(t('Already verified')); return; }
-  peer.verified = true;
-  peer.verified_at = now();
+  if (confirmedBy(peer) !== 'none') { out(t('Already verified')); return; }
+  markConfirmed(peer, 'number', now());   // 番号の読み合わせ＝確認の方法「番号照合」として記録
   await writePeer(pairId, peer);
   await logEvent(pairId, { type: 'verified', peer: peer.device_id }, now());
-  out(tf('Pair "{pair}" pinned as verified. You can send now', { pair: pairId }));
+  out(tf('Pair "{pair}" recorded as confirmed by number check', { pair: pairId }));
 }
 
 async function cmdSend(pairId, textParts) {
@@ -506,12 +504,14 @@ async function cmdLog(pairId, flags) {
   }
 }
 
+const CONFIRM_LABEL = { invite: t('invite code'), qr: t('in-person QR'), number: t('number check'), none: t('not confirmed') };
 async function cmdPairs() {
   const pairs = await listPairs();
   if (!pairs.length) { out(t('(no pairs)')); return; }
   for (const pid of pairs) {
     const peer = await readPeer(pid).catch(() => null);
-    const mark = peer ? (peer.verified ? '✓verified' : '…unverified') : '?';
+    // 確認の方法を淡々と出す（確認なしも異常ではない。印や警告は付けない）。
+    const mark = peer ? CONFIRM_LABEL[confirmedBy(peer)] : '?';
     out(`${pid}\t${peer?.device_id || ''}\t${mark}`);
   }
 }

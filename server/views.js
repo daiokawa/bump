@@ -6,7 +6,7 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { identityPath, pairPaths } from '../lib/paths.js';
 import { listPairs, readPeer, readJson, writeJson } from '../lib/store.js';
-import { pairSafetyNumber } from '../lib/pairing.js';
+import { pairSafetyNumber, confirmedBy } from '../lib/pairing.js';
 import { receiveInbox, sendReceipt, receiptsEnabled, readSentStatus, CONTROL_TYPES } from '../lib/exchange.js';
 const isControl = (m) => CONTROL_TYPES.includes(m.type); // 受領・プロフィール等＝人間の一覧に出さない
 import { pushToRelay, pullAllFromRelay } from '../lib/relay.js';
@@ -150,7 +150,7 @@ export async function stateJson() {
     const last = msgs.length ? msgs[msgs.length - 1].created_at : null;
     const flagged = msgs.some((m) => m.from === peer.device_id && sc[m.id] && sc[m.id].flag);
     pairs.push({ id, name: peer.name || '', alias: peer.alias || '', icon: peer.icon || '', avatar: peer.avatar || '', banner: peer.banner || '', label: contactLabel(id, peer.name, peer.alias, peer.ai),
-      device: peer.device_id.slice(0, 8), verified: !!peer.verified,
+      device: peer.device_id.slice(0, 8), verified: !!peer.verified, confirmed: confirmedBy(peer),
       unread, online: reach.online, lastActivity: last, visible, flagged });
   }
   return { me: { device_id: me.device_id }, pairs };
@@ -173,7 +173,7 @@ export async function pairJson(id, opt = {}) {
   if (limit) list = list.slice(first);
   const hasMore = list.length > 0 ? all.findIndex((m) => m.id === list[0].id) > 0 : false;
   return {
-    id, verified: !!peer.verified, device: peer.device_id.slice(0, 12),
+    id, verified: !!peer.verified, confirmed: confirmedBy(peer), device: peer.device_id.slice(0, 12),
     name: peer.name || '', alias: peer.alias || '', label: contactLabel(id, peer.name, peer.alias, peer.ai),
     avatar: peer.avatar || '', banner: peer.banner || '', links: peer.links || '', channels: sanitizeChannels(peer.channels),
     safety: sn.display, visible: !!peer.show_presence, online: reach.online, lastSeen: reach.lastSeen,

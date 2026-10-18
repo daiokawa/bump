@@ -246,6 +246,7 @@ async function renderMain(){
     const stat=p.invite?(p.invite.conflict?t('⚠ Invite code duplicated'):t('✓ Invite code matches')):t('No invite code');
     M.append(mHead(av,(p.name||t('No name')),tf('Connection request received {at}',{at:ts(p.at)}),stat,p.invite?(p.invite.conflict?'no':'ok'):''));
     const body=el('div','m-body');
+    const kc=keyChangedCard(p);if(kc)body.append(kc);
     // 1) 本人確認：合言葉の照合結果。ここが緑なら人の確認作業は要らない。
     const c1=el('div','card2');const h1=el('h4');h1.textContent=t('Identity check');c1.append(h1);
     const t1=el('div');t1.style.cssText='font-size:13.5px;line-height:1.8';

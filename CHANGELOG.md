@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-15
+
+- **Contacts now show how they were confirmed — invite code, in-person QR, or not confirmed — instead of verified/unverified.** Every bond read "…unverified" in `bump pairs`, even ones approved through a matched invite code: approval matched the code but never recorded it. The two-state label also implied a chore (reading numbers aloud) nobody needed. Approvals where the invite code matched now record `invite`; a camera scan records `qr`; `bump verify` records `number`. Shown quietly in `bump pairs`, contact settings, and the MCP `trust` field (`invite` / `qr` / `number` / `none`). Old `peer.json` files read as before (`verified: true` → in-person QR), and `verified` is still written so older versions see the same meaning.
+- **A changed key now says what to do.** The refusal stays — bump still never silently re-pairs a contact to a new key — but instead of "delete peer.json by hand" it says *"X's key has changed. If they reinstalled, reconnect with a new package."* That advice now actually works: a connection request whose invite code from a new package matches can replace the key on approval (the old record is kept beside it as `peer.replaced-*.json`). Without a matching code, approval is refused. The request card flags the key change before you approve.
+
 ## 2026-09-14
 
 - **The stale-session counter now works for git-pull installs too.** The console's "N sessions running old code" check keyed off `build.txt`, which only the app's launcher writes — a repo install has no such file, so the check silently reported nothing at all, and the layer it was built for (long-lived sessions) stayed invisible exactly where sessions live longest. Found by H.S. via `/api/health` right after applying eight releases in one pull. When `build.txt` is absent the console now takes the applied-time from the git reflog — the moment HEAD last moved on that machine, i.e. when the pull actually landed, not when the commit was authored. App installs are unchanged.

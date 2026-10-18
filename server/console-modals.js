@@ -23,6 +23,7 @@ function openPairSettings(pairId,P){
   const c1=el('div','card2');const h1=el('h4');h1.textContent=t('Safety');c1.append(h1);
   const kv=(k,v)=>{const r=el('div','kv');const kk=el('div','k');kk.textContent=k;const vv=el('div','v');vv.textContent=v;r.append(kk,vv);return r;};
   c1.append(kv(t('Authority'),t('Zero (no tool execution, no shell, no file access)')));
+  c1.append(kv(t('How confirmed'),confirmLabel(P.confirmed)));
   const snl=el('div','kv');const snk=el('div','k');snk.textContent='safety number';const snv=el('div','sn');snv.textContent=P.safety;snl.append(snk,snv);c1.append(snl);panel.append(c1);
   // オンライン開示
   const c2=el('div','card2');const r=el('div','swrow');const box=el('div');const t3=el('div');t3.style.cssText='font-size:13px;font-weight:700';t3.textContent=t('Show this person when you are online');const d=el('div');d.style.cssText='font-size:11.5px;color:var(--muted);margin-top:2px';d.textContent=t('Off (default): they cannot tell whether you are online.');box.append(t3,d);
@@ -49,8 +50,23 @@ function openPairSettings(pairId,P){
 }
 // 接続リクエストの承認。本人確認は、専用パッケージに焼き込んだ合言葉の照合で済ませる（機械の仕事）。
 // 合言葉が無い申請（旧パッケージ・手動で招待した相手）だけ、device番号の読み合わせを案内する。
-// どちらの場合も「確認済み」という状態は持たせない＝何をしたかの記録だけ残す。
+// どちらの場合も「確認済み」という状態は持たせない＝何をしたか（確認の方法）の記録だけ残す。
 const fpGroups=(hex)=>{const g=String(hex||'').match(/.{1,4}/g)||[];return [g.slice(0,4).join(' '),g.slice(4).join(' ')].filter(Boolean).join('\n');};
+// 確認の方法（記録）。確認なしも異常ではないので、色も印も付けずに淡々と出す。
+const confirmLabel=(c)=>({invite:t('invite code'),qr:t('in-person QR'),number:t('number check')})[c]||t('not confirmed');
+// 同じ名前の縁が別の鍵で既にある時だけ、承認の前に目立たせる（ふだんは何も出さない）。
+// 新しいパッケージの合言葉が通っていれば、承認で鍵が置き換わる。通っていなければ承認は拒否される。
+function keyChangedCard(p){
+  if(!p.key_changed)return null;
+  const ok=p.invite&&!p.invite.conflict;
+  const c=el('div','card2');c.style.cssText=ok?'background:#fff7e8;border-color:#f3dcae':'background:#fdecee;border-color:#f6c9cf';
+  const h=el('div');h.style.cssText='font-size:13px;font-weight:800;color:'+(ok?'#9a6200':'var(--red)');
+  h.textContent=tf("{name}'s key has changed.",{name:p.key_changed});
+  const d=el('div');d.style.cssText='font-size:11.5px;margin-top:6px;line-height:1.7;color:'+(ok?'#6b5326':'#8c4149');
+  d.textContent=ok?t('The invite code from a new package matched, so approving replaces the old key with this one (the old record is kept aside).')
+    :t('If they reinstalled or similar, reconnect with a new package. If this is someone else, approve under a different name.');
+  c.append(h,d);return c;
+}
 // 承認の実行（縁ができる）。詳細画面からも確認ダイアログからも、通る道はここ1本。
 async function approvePending(p,name){
   const r=await (await fetch('/api/pending/approve',{method:'POST',headers:{'content-type':'application/json'},
@@ -64,6 +80,7 @@ function openApprove(p,after){
   // 一言は出さない（指示書の定型文で本人の言葉ではないため）。
   const sub=el('div','cropsub');sub.textContent=tf('Connection request, received {time}.',{time:ts(p.at)});
   panel.append(hd,sub);
+  const kc=keyChangedCard(p);if(kc)panel.append(kc);
   if(p.invite&&p.invite.conflict){
     // 同じ合言葉を別の鍵も使った＝パッケージが渡した先から流れている。片方は本人ではない。
     const c=el('div','card2');c.style.cssText='background:#fdecee;border-color:#f6c9cf';

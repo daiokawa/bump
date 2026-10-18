@@ -24,7 +24,7 @@ process.env.BUMP_HOME = SELF; // 以降 paths.js は自分のエンドを指す
 import QRCode from 'qrcode';
 const { readPeer, readJson, ensurePair, writePeer, logEvent, listPairs } = await import('../lib/store.js');
 const { pairPaths } = await import('../lib/paths.js');
-const { engagePeer } = await import('../lib/pairing.js');
+const { engagePeer, markConfirmed, carryConfirmation } = await import('../lib/pairing.js');
 const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage, unsendMessage } = await import('../lib/exchange.js');
 const { buildPackage, listPackages, discardPackage, MAX_PAYLOAD_BYTES } = await import('../lib/package.js');
 const { pushToRelay } = await import('../lib/relay.js');
@@ -36,12 +36,14 @@ const { freeBytes, hasRoom, humanBytes, MIN_FREE_BYTES } = await import('../lib/
 const { staleMcp } = await import('../lib/stale-mcp.js');
 const { receiveConnectRequests, listPending, readPending, dropPending, sendConnectRequest,
   readBlocked, blockDevice, unblockDevice } = await import('../lib/connect.js');
-const { matchInvite, markInviteUsed } = await import('../lib/invite.js');
+const { matchInvite, markInviteUsed, inviteConflict } = await import('../lib/invite.js');
 // データ層（サイドカー保存＋画面用JSONビュー）。BUMP_HOME 設定後に読み込む。
 const { identity, stateJson, pairJson, inboxJson, letterJson, sentJson,
   markTriage, addInquiry, sanitizeChannels, carryLocalPeer, contactLabel, OPEN_SCHEMES } = await import('./views.js');
 
 const now = () => new Date().toISOString();
+// 既存の縁と鍵が違う時の案内。黙って繋ぎ直さない（拒否は残す）が、次に何をすればいいかは言う。
+const keyChangedMsg = (name) => tf("{name}'s key has changed. If they reinstalled or similar, reconnect with a new package.", { name });
 let staleMcpCache = { at: 0, val: null };
 // 常駐サーバは、はぐれた例外1つで落ちてはいけない（操作席が消えるのは最悪）。ログして生き延びる。
 process.on('unhandledRejection', (e) => { try { console.error('unhandledRejection:', e && e.message); } catch {} });
@@ -170,7 +172,13 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/pending') {
       const me = await identity();
       await receiveConnectRequests({ myDeviceId: me.device_id, relayDir: RELAY, now }).catch(warner(t('receiving connect requests')));
-      return json(res, 200, await listPending());
+      const list = await listPending();
+      // 同じ名前の縁が別の鍵で既にある＝鍵が変わった（入れ直し等）か、同名の別人。承認の前に見せる。
+      for (const rec of list) {
+        let ex = null; try { ex = await readPeer((rec.name || '').slice(0, 40)); } catch {}
+        if (ex && ex.device_id !== rec.device_id) rec.key_changed = contactLabel(rec.name, ex.name, ex.alias, ex.ai);
+      }
+      return json(res, 200, list);
     }
     // 承認＝その場でengage（相手の公開鍵は申請に含まれ、署名検証済み）。縁の名前は人が付ける。
     if (url.pathname === '/api/pending/approve' && req.method === 'POST') {
@@ -179,18 +187,29 @@ const server = createServer(async (req, res) => {
       if (!rec) return json(res, 404, { error: 'not found' });
       const id = (b.id || rec.name || `pair-${rec.device_id.slice(0, 6)}`).slice(0, 40);
       let ex = null; try { ex = await readPeer(id); } catch {}
-      if (ex && ex.device_id !== rec.device_id) return json(res, 409, { error: t('That name is already used for another peer') });
+      // 合言葉の照合が通った（かつ別の鍵が同じ合言葉を名乗っていない）承認は「合言葉」で確認したと記録する。
+      const iv = rec.invite ? await matchInvite(rec.invite_proof, rec.device_id) : null;
+      const inviteOk = !!iv && !inviteConflict(iv, rec.device_id);
+      let replaced = null;
+      if (ex && ex.device_id !== rec.device_id) {
+        // 同じ名前の縁に別の鍵。新しいパッケージの合言葉が通った時だけ、人の承認で鍵を置き換える。
+        // それ以外は拒否（黙って繋ぎ直さない）。古い peer.json は消さずに横へ退避する。
+        if (!inviteOk) return json(res, 409, { error: keyChangedMsg(contactLabel(id, ex.name, ex.alias, ex.ai))
+          + t(' (If this is someone else, approve under a different name.)') });
+        replaced = ex.device_id;
+        await writeFile(join(pairPaths(id).base, `peer.replaced-${now().replace(/[:.]/g, '')}.json`), JSON.stringify(ex, null, 2));
+      }
       await ensurePair(id);
       const peer = engagePeer({ pairId: id, bundle: rec });
       peer.engaged_at = now(); peer.name = rec.name || '';
       carryLocalPeer(peer, ex);
+      markConfirmed(peer, inviteOk ? 'invite' : 'none', now());
+      carryConfirmation(peer, ex);
       await writePeer(id, peer);
-      // どのパッケージの合言葉で来たかを記録に残す（誰から誰へ渡ったかの系統）。ただし
-      // 「確認済み」という状態は peer に固定しない＝確認は済んだ瞬間から過去のものになる。
-      const iv = rec.invite ? await matchInvite(rec.invite_proof, rec.device_id) : null;
+      // どのパッケージの合言葉で来たかも記録に残す（誰から誰へ渡ったかの系統）。
       if (iv) await markInviteUsed(iv.token, rec.device_id, now());
       await logEvent(id, { type: 'engaged', peer: peer.device_id, via: 'connect-request',
-        invite: iv ? iv.label : null }, now());
+        invite: iv ? iv.label : null, confirmed_by: peer.confirmed_by, ...(replaced ? { replaced } : {}) }, now());
       await dropPending(rec.device_id);
       pushProfile(id);          // つながった相手へ自分のプロフィールを届ける
       return json(res, 200, { engaged: id });
@@ -276,19 +295,19 @@ const server = createServer(async (req, res) => {
       try {
         ex = await readPeer(id);
         if (ex.ed25519_pub !== bundle.ed25519_pub || ex.x25519_pub !== bundle.x25519_pub)
-          return json(res, 409, { error: 'key changed — refusing to re-pair silently' });
+          return json(res, 409, { error: keyChangedMsg(contactLabel(id, ex.name, ex.alias, ex.ai)), key_changed: true });
       } catch {}
       await ensurePair(id);
       const peer = engagePeer({ pairId: id, bundle });
       peer.engaged_at = now();
       peer.name = bundle.name || ''; peer.icon = bundle.icon || ''; peer.avatar = bundle.avatar || ''; peer.banner = bundle.banner || ''; peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels); // 相手の認証済みプロフィール
-      peer.verified = b.via === 'camera';           // 直接スキャンのみ検証済み
-      peer.verified_at = peer.verified ? now() : null;
+      markConfirmed(peer, b.via === 'camera' ? 'qr' : 'none', now()); // 直接スキャンのみ対面QR
       carryLocalPeer(peer, ex);                      // 手元設定(表示名・可視化等)は再接続でも保全
+      carryConfirmation(peer, ex);
       await writePeer(id, peer);
       await logEvent(id, { type: peer.verified ? 'paired-verified' : 'engaged', peer: peer.device_id }, now());
       pushProfile(id); // つながった相手へ自分のプロフィールを届ける（鍵だけengageでも絵が出る）
-      return json(res, 200, { id, verified: peer.verified });
+      return json(res, 200, { id, verified: peer.verified, confirmed: peer.confirmed_by });
     }
     // この相手の"こちら側だけの呼び名"を設定/解除（空で相手の署名済み名に戻る）。
     if (url.pathname === '/api/rename' && req.method === 'POST') {
@@ -390,6 +409,7 @@ const server = createServer(async (req, res) => {
       await ensurePair(b.id); const peer = engagePeer({ pairId: b.id, bundle }); peer.engaged_at = now();
       peer.name = bundle.name || ''; peer.icon = bundle.icon || ''; peer.avatar = bundle.avatar || ''; peer.banner = bundle.banner || ''; peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels);
       carryLocalPeer(peer, ex);                      // 手元設定は再接続でも保全
+      carryConfirmation(peer, ex);
       await writePeer(b.id, peer); await logEvent(b.id, { type: 'engaged', peer: peer.device_id }, now());
       pushProfile(b.id); // つながった相手へ自分のプロフィールを届ける
       return json(res, 200, { engaged: b.id });
@@ -397,7 +417,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/verify' && req.method === 'POST') {
       const b = await body(req);
       const { writePeer, logEvent } = await import('../lib/store.js');
-      const peer = await readPeer(b.id); peer.verified = true; peer.verified_at = now();
+      const peer = markConfirmed(await readPeer(b.id), 'number', now());
       await writePeer(b.id, peer); await logEvent(b.id, { type: 'verified', peer: peer.device_id }, now());
       return json(res, 200, { verified: b.id });
     }

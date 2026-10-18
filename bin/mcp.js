@@ -19,6 +19,7 @@ import { sendMessage, receiveInbox, sendReceipt, receiptsEnabled, unsendMessage,
 import { pushToRelay, pullFromRelay } from '../lib/relay.js';
 import { reachOf } from '../lib/presence.js';
 import { screen } from '../lib/guard.js';
+import { confirmedBy } from '../lib/pairing.js';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -83,7 +84,7 @@ async function toolEngaged() {
     await pullFromRelay({ pairId: id, relayDir: RELAY, myDeviceId: me.device_id, peerDeviceId: peer && peer.device_id }).catch(() => {});
     await receiveInbox({ identity: me, peer, pairId: id, now }).catch(() => {});
     const reach = await reachOf({ relayDir: RELAY, pairId: id, peerDeviceId: peer.device_id, nowIso: now() });
-    rows.push({ pair: id, trust: peer.verified ? 'verified' : 'engaged',
+    rows.push({ pair: id, trust: confirmedBy(peer),
       reachable: reach.online, unread: await unreadOf(id, peer.device_id), device: peer.device_id.slice(0, 8) });
   }
   // my_device_id ＝自分の鍵の指紋。相手が承認の前に「本人ですか」と別経路で聞いてくることがあり、
@@ -95,7 +96,6 @@ async function toolSend({ pair, body }) {
   if (!pair || !body) throw new Error('pair and body required');
   const me = await identity();
   const peer = await readPeer(pair);
-  if (!peer.verified && !peer.show_presence) { /* engagedでも送信は可。verifiedは任意 */ }
   const { msg } = await sendMessage({ identity: me, peer, pairId: pair, body, now });
   await pushToRelay({ pairId: pair, relayDir: RELAY, peerDeviceId: peer.device_id });
   return { placed: msg.id, note: 'Letter placed on the relay (async). Your peer reads it when they are free.' };
@@ -157,7 +157,7 @@ async function toolRead({ pair, limit = 10 }) {
 const server = new Server({ name: 'bump', version: '0.1.0' }, { capabilities: { tools: {} } });
 
 const TOOLS = [
-  { name: 'bump_engaged', description: 'List engaged bonds (trust state, reachability, unread count) plus your own device number (my_device_id). Pulls from the relay first, so one call tells you whether a reply arrived (unread>0) — this is the arrival check. If a peer asks for your device number to confirm identity, give them my_device_id. Bodies come via bump_read.',
+  { name: 'bump_engaged', description: 'List engaged bonds (trust = how the bond was confirmed: invite = invite code matched at approval, qr = in-person QR scan, number = numbers read aloud, none = not confirmed; reachability, unread count) plus your own device number (my_device_id). Pulls from the relay first, so one call tells you whether a reply arrived (unread>0) — this is the arrival check. If a peer asks for your device number to confirm identity, give them my_device_id. Bodies come via bump_read.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'bump_send', description: 'Leave a letter on the given bond, asynchronously (signed, E2E-encrypted, via a blind relay). The body is only text handed over on a human\'s instruction. Communication only; nothing is executed.',
     inputSchema: { type: 'object', properties: {

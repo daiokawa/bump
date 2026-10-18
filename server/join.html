@@ -37,8 +37,7 @@ const JADICT={
   'Could not verify the invite link.':'招待リンクの検証に失敗しました。',
   'Connected':'つながりました',
   'They are in your list as engaged. You can now exchange letters, asynchronously.':'相手をEngagedに追加しました。これで非同期にやり取りできます。',
-  'engaged (unverified)':'engaged（未検証）',
-  'To raise this to "verified" — no one in the middle — hold up a QR face to face, or confirm an invite code once (deep in settings).':'中間者ゼロの「検証済み」に上げるには、対面でQRをかざすか、合言葉を一度だけ確認します（設定の奥）。'
+  'How confirmed: not confirmed (connected by link)':'確認の方法：確認なし（リンクで接続）'
 };
 const t=s=>JA?(JADICT[s]||s):s;
 const el=(t,c)=>{const n=document.createElement(t);if(c)n.className=c;return n;};
@@ -57,16 +56,15 @@ function fail(msg){
   try{ history.replaceState(null,'',location.pathname); }catch(e){}
   const r=await (await fetch('/api/scan',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({bundle,via:'link'})})).json();
+  if(r.key_changed){ return fail(r.error); }   // 既存の縁と鍵が違う＝黙って繋ぎ直さない（文言はサーバ側で翻訳済み）
   if(r.error){ return fail(r.error==='expired'?t('This invite link has expired (5 minutes). Ask them to send a new one.'):t('Could not verify the invite link.')); }
   const dev=(bundle.device_id||'').slice(0,2).toUpperCase();
   const ava=el('div','ava');ava.textContent=dev||'?';
   const h=el('h1');h.textContent=t('Connected');
   const s=el('div','sub');s.textContent=t('They are in your list as engaged. You can now exchange letters, asynchronously.');
-  const tag=el('div','tag eng');tag.textContent=t('engaged (unverified)');
-  const note=el('div','sub');note.style.marginTop='12px';
-  note.textContent=t('To raise this to "verified" — no one in the middle — hold up a QR face to face, or confirm an invite code once (deep in settings).');
+  const tag=el('div','tag eng');tag.textContent=t('How confirmed: not confirmed (connected by link)');
   const btn=el('button');btn.textContent=t('Open bump');btn.onclick=()=>location.href='/';
-  show([ava,h,s,tag,note,btn]);
+  show([ava,h,s,tag,btn]);
 })();
 </script>
 <script>
