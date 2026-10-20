@@ -93,8 +93,10 @@ const server = createServer(async (req, res) => {
   const loopback = process.env.MM_BEHIND_PROXY === '1' || ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   if (!loopback && !rateOk(ip)) return json(res, 429, { error: 'rate' });
   try {
-    // box (保存先パス) は返さない: Funnel 越しに外へ username とフォルダ構成を教えていた (2026-10-21 スキャナー来訪で発覚)
-    if (url.pathname === '/health' || url.pathname === '/') return json(res, 200, { ok: true });
+    // Funnel 越し(=外)には / と /health も知らない道も返事をせず切る。スキャナーには何も無いのと同じに見せる。
+    // 動作確認は手元(ループバック/tailnet)からだけ。box(保存先パス)も返さない (2026-10-21 スキャナー来訪で発覚)
+    const fromFunnel = 'tailscale-funnel-request' in req.headers;
+    if (url.pathname === '/health' || url.pathname === '/') return fromFunnel ? req.socket.destroy() : json(res, 200, { ok: true });
 
     // 投函: {to_routing_id, envelope} を宛先メールボックスへ追記（seqはディスク連番＝再起動でも継続）。
     if (url.pathname === '/put' && req.method === 'POST') {
@@ -163,7 +165,7 @@ const server = createServer(async (req, res) => {
       await unlink(join(ridDir(rid), f)).catch(() => {});
       return json(res, 200, { ok: true, removed: true });
     }
-    return json(res, 404, { error: 'not found' });
+    return fromFunnel ? req.socket.destroy() : json(res, 404, { error: 'not found' });
   } catch (e) {
     return json(res, e.message === 'too large' ? 413 : 400, { error: e.message });
   }
