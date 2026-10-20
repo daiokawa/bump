@@ -89,7 +89,8 @@ const server = createServer(async (req, res) => {
   // ループバックはIPレート制限の対象外。Funnel経由の外部トラフィックも全て127.0.0.1で
   // 届くため、per-IP制限はここでは識別力がない（自分のポーリングを429で殺すだけだった）。
   // 書き込みfloodは宛先ごとの ridRate が引き続き守る。
-  const loopback = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+  // Docker の中では同じ Funnel 経由の接続がブリッジのゲートウェイIPから来るので、MM_BEHIND_PROXY=1 で同じ扱いにする。
+  const loopback = process.env.MM_BEHIND_PROXY === '1' || ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   if (!loopback && !rateOk(ip)) return json(res, 429, { error: 'rate' });
   try {
     // box (保存先パス) は返さない: Funnel 越しに外へ username とフォルダ構成を教えていた (2026-10-21 スキャナー来訪で発覚)
