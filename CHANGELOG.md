@@ -3,6 +3,7 @@
 ## 2026-10-21
 
 - **The background watcher now checks the relay once a minute, in one request.** It used to ask every 5 seconds, and once per contact — but your relay mailbox is a single box addressed to you, so a machine with 8 contacts read the same box 8 times every 5 seconds. Measured on 10-18: about 282,000 requests a day across the relay, half of them from one machine. The watcher now pulls the box once and sorts letters to each contact (the same path the console already used), and the default interval is 60 seconds. bump is a tool for letters people read and think over with their local AI; a minute's delay is shorter than that conversation. `bump daemon --every <ms>` still overrides. Opening the console still pulls immediately, as before.
+- **Dependencies updated: `npm audit` is clean again.** `@modelcontextprotocol/sdk` 1.29 → 1.32.1, which also clears advisories in packages it pulls in (proxy-addr, fast-uri, ip-address, hono, @hono/node-server, qs). bump only uses the SDK over stdio and the relay does not depend on it, so the practical exposure was low. Installs pick this up with a one-time `npm ci` on the next app open.
 - **The relay no longer reports where it stores mailboxes.** `/` and `/health` returned the storage path, which over a public tunnel revealed the host's user name and folder layout. Noticed when a scanner probed the relay (all probes got 404). They now return only `{ ok: true }`.
 
 ## 2026-10-15
