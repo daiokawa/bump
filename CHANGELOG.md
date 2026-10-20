@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-21
+
+- **The background watcher now checks the relay once a minute, in one request.** It used to ask every 5 seconds, and once per contact — but your relay mailbox is a single box addressed to you, so a machine with 8 contacts read the same box 8 times every 5 seconds. Measured on 10-18: about 282,000 requests a day across the relay, half of them from one machine. The watcher now pulls the box once and sorts letters to each contact (the same path the console already used), and the default interval is 60 seconds. bump is a tool for letters people read and think over with their local AI; a minute's delay is shorter than that conversation. `bump daemon --every <ms>` still overrides. Opening the console still pulls immediately, as before.
+- **The relay no longer reports where it stores mailboxes.** `/` and `/health` returned the storage path, which over a public tunnel revealed the host's user name and folder layout. Noticed when a scanner probed the relay (all probes got 404). They now return only `{ ok: true }`.
+
 ## 2026-10-15
 
 - **Contacts now show how they were confirmed — invite code, in-person QR, or not confirmed — instead of verified/unverified.** Every bond read "…unverified" in `bump pairs`, even ones approved through a matched invite code: approval matched the code but never recorded it. The two-state label also implied a chore (reading numbers aloud) nobody needed. Approvals where the invite code matched now record `invite`; a camera scan records `qr`; `bump verify` records `number`. Shown quietly in `bump pairs`, contact settings, and the MCP `trust` field (`invite` / `qr` / `number` / `none`). Old `peer.json` files read as before (`verified: true` → in-person QR), and `verified` is still written so older versions see the same meaning.

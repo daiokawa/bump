@@ -37,7 +37,7 @@ import {
 import { engagePeer, pairSafetyNumber, pubkeysChanged, confirmedBy, markConfirmed } from '../lib/pairing.js';
 import { sendMessage, receiveInbox, CONTROL_TYPES, sendPackage } from '../lib/exchange.js';
 import { buildPackage, listPackages } from '../lib/package.js';
-import { pushToRelay, pullFromRelay } from '../lib/relay.js';
+import { pushToRelay, pullFromRelay, pullAllFromRelay } from '../lib/relay.js';
 import { callLocalAI } from '../lib/agent.js';
 import { tmuxNotify, osaNotify, chatworkNotify } from '../lib/notify.js';
 import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
@@ -324,7 +324,9 @@ async function cmdDaemon(flags) {
   const id = await loadIdentity();
   const relayDir = flags.relay || process.env.MM_RELAY;
   const tmux = flags.tmux;            // 自分のタブのtmuxセッション名（無ければ標準出力）
-  const everyMs = Number(flags.every) || 5000;
+  // 既定60秒。人が読んで手元AIとやり取りする間合いの道具なので、5秒で見張る理由がない
+  // （大川さん判断 2026-10-21。5秒×縁の数で中継が1日28万件叩かれていた）。
+  const everyMs = Number(flags.every) || 60000;
   const submit = flags['no-enter'] ? false : true;
   const seen = {};                   // pairId -> Set(既知の相手msg id。初見時は取り込み前の手元分で埋める)
   out(tf('bump daemon: watching this end ({id})', { id: id.device_id.slice(0, 8) }) +
@@ -352,8 +354,14 @@ async function cmdDaemon(flags) {
 
   for (;;) {
     await checkUpdate();
-    for (const pairId of await listPairs()) {
-      let peer; try { peer = await readPeer(pairId); } catch { continue; }
+    // 中継の受信箱は自分宛の1つ。縁ごとに /get すると同じ箱を縁の数だけ読むので、1回で取って振り分ける。
+    const pairIds = await listPairs(), peers = {}, peersOf = {};
+    for (const pairId of pairIds) {
+      try { const p = await readPeer(pairId); peers[pairId] = p; peersOf[p.device_id] = pairId; } catch {}
+    }
+    if (relayDir) await pullAllFromRelay({ relayDir, myDeviceId: id.device_id, peersOf }).catch(() => {});
+    for (const pairId of pairIds) {
+      const peer = peers[pairId]; if (!peer) continue;
       const p = pairPaths(pairId);
       // 初見の縁は「取り込む前に手元にあった分」だけを既知にする。
       // 以前は取り込んだ後に初回をまるごと黙らせていたため、Macを落としている間に届いた手紙も
@@ -365,7 +373,6 @@ async function cmdDaemon(flags) {
           try { const m = await readJson(join(p.messages, f)); if (m.from === peer.device_id) seen[pairId].add(m.id); } catch {}
         }
       }
-      if (relayDir) await pullFromRelay({ pairId, relayDir, myDeviceId: id.device_id, peerDeviceId: peer && peer.device_id }).catch(() => {});
       await receiveInbox({ identity: id, peer, pairId, now }).catch(() => {});
       // 送信失敗で outbox に残った封筒を投函し直す。中継が落ちている間に送った手紙は
       // 「送信失敗」のまま座り続け、その縁で次の動きがあるまで再送されなかった（2026-08-05）。
