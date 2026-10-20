@@ -92,7 +92,8 @@ const server = createServer(async (req, res) => {
   const loopback = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   if (!loopback && !rateOk(ip)) return json(res, 429, { error: 'rate' });
   try {
-    if (url.pathname === '/health' || url.pathname === '/') return json(res, 200, { ok: true, box: BOX });
+    // box (保存先パス) は返さない: Funnel 越しに外へ username とフォルダ構成を教えていた (2026-10-21 スキャナー来訪で発覚)
+    if (url.pathname === '/health' || url.pathname === '/') return json(res, 200, { ok: true });
 
     // 投函: {to_routing_id, envelope} を宛先メールボックスへ追記（seqはディスク連番＝再起動でも継続）。
     if (url.pathname === '/put' && req.method === 'POST') {
