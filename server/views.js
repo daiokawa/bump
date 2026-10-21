@@ -11,7 +11,7 @@ import { receiveInbox, sendReceipt, receiptsEnabled, readSentStatus, CONTROL_TYP
 const isControl = (m) => CONTROL_TYPES.includes(m.type); // 受領・プロフィール等＝人間の一覧に出さない
 import { pushToRelay, pullAllFromRelay } from '../lib/relay.js';
 import { beat, reachOf } from '../lib/presence.js';
-import { screen } from '../lib/guard.js';
+import { screen, skipScreen } from '../lib/guard.js';
 import { warn } from '../lib/log.js';
 import { hasRoom, humanBytes, freeBytes } from '../lib/disk.js';
 import { t, tf } from '../lib/i18n.js';
@@ -34,7 +34,7 @@ async function screenPair(pairId, peerDeviceId) {
   const sc = await readScreen(pairId);
   const msgs = await messagesOf(pairId);
   for (const m of msgs) {
-    if (m.from !== peerDeviceId || sc[m.id]) continue;
+    if (m.from !== peerDeviceId || sc[m.id] || skipScreen(m)) continue;
     const key = pairId + ':' + m.id;
     if (screenInFlight.has(key)) continue;
     screenInFlight.add(key);

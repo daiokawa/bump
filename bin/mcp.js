@@ -18,7 +18,7 @@ import { listPairs, readPeer, readJson, writeJson } from '../lib/store.js';
 import { sendMessage, receiveInbox, sendReceipt, receiptsEnabled, unsendMessage, CONTROL_TYPES } from '../lib/exchange.js';
 import { pushToRelay, pullFromRelay } from '../lib/relay.js';
 import { reachOf } from '../lib/presence.js';
-import { screen } from '../lib/guard.js';
+import { screenMany } from '../lib/guard.js';
 import { confirmedBy } from '../lib/pairing.js';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
@@ -123,9 +123,10 @@ async function toolRead({ pair, limit = 10 }) {
   const msgs = (await messagesOf(pair)).filter((m) => m.from === peer.device_id);
   // 未点検のものを行動前にメタ点検（on-demand・同期）
   let changed = false;
-  for (const m of msgs) {
-    if (!sc[m.id]) { const v = await screen({ body: m.body }); if (v.checked) { sc[m.id] = { flag: v.flag, reason: v.reason }; changed = true; } }
-  }
+  const todo = msgs.filter((m) => !sc[m.id]);
+  (await screenMany(todo)).forEach((v, i) => {
+    if (v && v.checked) { sc[todo[i].id] = { flag: v.flag, reason: v.reason }; changed = true; }
+  });
   if (changed) await writeJson(screenPath(pair), sc);
   // 読んだ相手メッセージは既読に（unreadが減る）。
   await writeJson(seenPath(pair), msgs.map((m) => m.id));
