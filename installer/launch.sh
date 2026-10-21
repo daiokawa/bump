@@ -33,6 +33,9 @@ alert(){ echo "ALERT: $1"; [ -z "$NONI" ] && osascript -e "display alert \"bump\
 ask(){ [ -n "$NONI" ] && { echo ""; return; }; osascript -e "text returned of (display dialog \"$1\" default answer \"$2\")" 2>/dev/null; }
 
 [ -x "$NODE" ] || { alert "Node.js が見つかりません。claude cli を入れていれば Node もあります（要 Node 20+）。"; exit 1; }
+# .app から開くと PATH が最小限で、npm（中で node を探す）も claude も見つからない
+# （Y.K.報告 2026-10-21: npm ci が黙って失敗し、MCP SDK が弱点ありの旧版のまま残った）。
+export PATH="$(dirname "$NODE"):/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.claude/local:$PATH"
 
 # 0.5) 自動更新: GitHubの最新を取れたら、それを導入元に重ねる（人がアプリを開いた時だけ動く）。
 # 取れない環境（オフライン・git無し）は同梱版で進む＝更新は付加であって前提ではない。
@@ -64,12 +67,35 @@ if [ -n "$UPDATED_SHA" ]; then
   if ! cmp -s "$HOME/.bump-latest/package-lock.json" "$DEST/package-lock.json"; then NEED_CI=1; else NEED_CI=""; fi
   rsync -a --exclude .git --exclude node_modules "$HOME/.bump-latest/" "$DEST/"
   if [ -n "$NEED_CI" ]; then
-    (cd "$DEST" && npm ci --omit=dev >/dev/null 2>&1) && echo "auto-update: 依存も更新" || echo "auto-update: 依存更新に失敗（同梱のまま続行）"
+    # 別の場所で揃えてから入れ替える。npm ci は最初に node_modules を消すので、
+    # その場で失敗すると同梱の依存まで失う。
+    STAGE="$HOME/.bump-app-deps"; rm -rf "$STAGE"; mkdir -p "$STAGE"
+    cp "$DEST/package.json" "$DEST/package-lock.json" "$STAGE/"
+    if (cd "$STAGE" && npm ci --omit=dev --no-audit --no-fund >>"$LOG" 2>&1); then
+      rm -rf "$DEST/node_modules" && mv "$STAGE/node_modules" "$DEST/node_modules" && echo "auto-update: 依存も更新"
+    else echo "auto-update: 依存更新に失敗（同梱のまま続行）"; fi
+    rm -rf "$STAGE"
   fi
   printf 'アプリ版 %s (%s) auto-updated\n' "$(date '+%Y-%m-%d')" "$UPDATED_SHA" > "$DEST/build.txt"
   rm -rf "$HOME/.bump-latest"
 fi
 cd "$DEST" || exit 1
+
+# 1.1) 依存が package-lock どおりかを確かめる。食い違っていたら黙らずに知らせる
+# （更新に失敗して旧版の依存のまま動き続けるのを、本人が気づける形にする）。
+DEP_DRIFT="$("$NODE" -e '
+  const fs = require("fs"); const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+  const bad = [];
+  for (const [k, v] of Object.entries(lock.packages || {})) {
+    if (!k.startsWith("node_modules/") || v.dev) continue;
+    try { const got = JSON.parse(fs.readFileSync(k + "/package.json", "utf8")).version; if (got !== v.version) bad.push(k.slice(13) + " " + got + "≠" + v.version); }
+    catch { if (!v.optional) bad.push(k.slice(13) + " なし"); }
+  }
+  console.log(bad.slice(0, 3).join(", "));' 2>/dev/null)"
+if [ -n "$DEP_DRIFT" ]; then
+  echo "deps: package-lock と食い違い: $DEP_DRIFT"
+  alert "部品（依存）の更新が済んでいません: ${DEP_DRIFT}。ターミナルで cd ~/.bump-app && npm ci --omit=dev を実行するか、ログ ~/Library/Logs/bump.log を添えて配布者にお知らせください。"
+fi
 
 # 1.4) 事故でできた「空の鍵」の救済。壊れた版が移行せずに新しい鍵だけ作った場合、
 # ~/.bump は在るが縁がゼロ。フォルダの有無だけで移行をスキップすると、この状態は
@@ -130,30 +156,83 @@ else echo "claude not found: MCP登録は後で"; fi
 # 生きていても止めて立て直す＝アプリをダブルクリックするだけで更新が反映される（更新手順が無い）。
 # 応答しない残骸の片付けも同じ操作で済む（自動復旧）。
 alive_http() { curl -s -o /dev/null --max-time 3 "http://localhost:$PORT/api/state"; }
-# launchd(KeepAlive)で自分のbumpを管理している人がいる（Y.K. 2026-08-04）。
-# その場合 pkill してもlaunchdが立て直し、この後のnohupと二重に走って通知が二重に鳴る。
-# 見つけたら先にlaunchd側を止める（無ければ何もしない）。
-# 検証ポート(MM_PORT指定)では触らない＝配る側のMacで本番のlaunchdを巻き込まないため。
-if [ "$PORT" = "8790" ]; then
-  # application.* ＝ open経由で起動された「このアプリ自身」のラベル。含めると自分をbootout
-  # して更新の途中で死に、旧版が残る（旧名時代の実報告 2026-08-13）。ラベルはフィールドで見る。
-  # 旧名(middleman)のlaunchdもここで毎回掃く。移行ブロック内の撤去だけだと、移行初回が
-  # 途中で死んだ場合に撤去だけが永久にスキップされる（K.K.指摘 2026-08-16: 通知二重化と
-  # 8790の取り合いが残る片道の穴）。毎回実行なら冪等で、残骸が無ければ何もしない。
-  for L in $(launchctl list 2>/dev/null | awk '$3 ~ /bump|middleman/ && $3 !~ /^application\./ {print $3}'); do
-    launchctl bootout "gui/$(id -u)/${L}" >/dev/null 2>&1 && echo "launchd stop: ${L} (replacing with the new build)"
+# 常駐（画面・通知）は launchd に登録して、ログイン後も自動で立ち上がるようにする。
+# 開くたびに登録し直す＝走っているプロセスを新しい本体に入れ替える。
+# 止めるのは bump 自身のラベル（chat.bump.app.*）と旧名(middleman)の残骸だけ。利用者が自分で
+# 登録した常駐は止めない（Y.K.報告 2026-10-21: 開くたびに外されていた）。その役割は利用者の登録に
+# 任せ、再起動だけして新しい本体を読ませる。こちらからは重ねて起動しない（通知の二重化を防ぐ）。
+# 検証ポート(MM_PORT指定)では launchd に触らない＝配る側のMacで本番を巻き込まないため。
+APP_LA="$HOME/Library/LaunchAgents"
+app_plist() { # $1=label $2..=node以降の引数
+  local label="$1"; shift
+  local args="<string>$NODE</string>"; for a in "$@"; do args="$args<string>$a</string>"; done
+  local relay=""; [ -n "$RELAY_URL" ] && relay="<key>MM_RELAY_URL</key><string>$RELAY_URL</string>"
+  mkdir -p "$APP_LA"
+  cat > "$APP_LA/$label.plist" <<PL
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key><array>$args</array>
+  <key>WorkingDirectory</key><string>$DEST</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>$PATH</string>
+    <key>BUMP_HOME</key><string>$MIDHOME</string><key>MM_SELF</key><string>$MIDHOME</string>
+    <key>MM_RELAY</key><string>$RELAY</string>$relay
+  </dict>
+  <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>$LOG</string><key>StandardErrorPath</key><string>$LOG</string>
+</dict></plist>
+PL
+  launchctl bootout "gui/$(id -u)/$label" >/dev/null 2>&1
+  local i; for i in 1 2 3 4 5; do   # bootout 直後は前のジョブが消えきらず bootstrap が失敗することがある
+    launchctl bootstrap "gui/$(id -u)" "$APP_LA/$label.plist" >/dev/null 2>&1 && { echo "launchd: $label を登録"; return 0; }
+    sleep 1
   done
+  echo "launchd: $label の登録に失敗。nohup で起動します"; nohup "$NODE" "$@" >>"$LOG" 2>&1 &
+}
+# 利用者自身の launchd 常駐のうち、役割（web / daemon）を担う plist を返す。
+# 読み込み中かどうかでなく plist ファイルで見る（以前の版に外されたままの登録も見つけて戻すため）。
+foreign_plist() { # $1=web|daemon
+  local pat f; [ "$1" = web ] && pat='server/web\.js' || pat='bump\.js daemon'
+  for f in "$APP_LA"/*.plist; do
+    [ -f "$f" ] || continue
+    case "$(basename "$f")" in chat.bump.app.*|*middleman*) continue;; esac
+    grep -q bump "$f" 2>/dev/null || continue
+    plutil -extract ProgramArguments json -o - "$f" 2>/dev/null | tr -d '[]"\\' | tr ',' ' ' | grep -Eq "$pat" && { echo "$f"; return; }
+  done
+}
+start_role() { # $1=web|daemon $2=自前ラベル $3..=引数
+  local role="$1" label="$2"; shift 2
+  local f L; f="$(foreign_plist "$role")"
+  if [ -n "$f" ]; then
+    launchctl bootout "gui/$(id -u)/$label" >/dev/null 2>&1; rm -f "$APP_LA/$label.plist"
+    L="$(plutil -extract Label raw -o - "$f" 2>/dev/null)"
+    launchctl bootstrap "gui/$(id -u)" "$f" >/dev/null 2>&1   # 外れていたら戻す（読み込み済みなら何も起きない）
+    launchctl kickstart -k "gui/$(id -u)/$L" >/dev/null 2>&1
+    echo "launchd: $role は利用者の登録 $L を再起動（こちらからは起動しない）"
+  else app_plist "$label" "$@"; fi
+}
+if [ "$PORT" = "8790" ]; then
+  # 旧名(middleman)の常駐は毎回掃く（移行初回が途中で死ぬと撤去だけが永久に漏れる＝K.K.指摘 2026-08-16）。
+  # application.* ＝ open経由で起動された「このアプリ自身」のラベルなので除く（2026-08-13）。
+  for L in $(launchctl list 2>/dev/null | awk '$3 ~ /middleman/ && $3 !~ /^application\./ {print $3}'); do
+    launchctl bootout "gui/$(id -u)/${L}" >/dev/null 2>&1 && echo "launchd stop: ${L} (旧名)"
+  done
+  # 以前の版が nohup で立てた常駐の片付け。利用者の launchd 常駐は KeepAlive で立ち直る。
+  pkill -f "server/web.js $PORT" >/dev/null 2>&1
+  pkill -f "bump.js daemon" >/dev/null 2>&1
+  pkill -f "middleman.js daemon" >/dev/null 2>&1
+  sleep 1
+  start_role web chat.bump.app.web "$DEST/server/web.js" "$PORT"
+  start_role daemon chat.bump.app.daemon "$DEST/bin/bump.js" daemon --notify osa
+else
+  pkill -f "server/web.js $PORT" >/dev/null 2>&1; sleep 1
+  nohup "$NODE" server/web.js "$PORT" >>"$LOG" 2>&1 &
+  echo "daemon: 検証ポートなので触らない"
 fi
-pkill -f "server/web.js $PORT" >/dev/null 2>&1
-[ "$PORT" = "8790" ] && pkill -f "bump.js daemon" >/dev/null 2>&1
-[ "$PORT" = "8790" ] && pkill -f "middleman.js daemon" >/dev/null 2>&1   # 旧名の常駐も毎回
-sleep 1
-nohup "$NODE" server/web.js "$PORT" >>"$LOG" 2>&1 &
-for i in 1 2 3 4 5 6 7 8; do sleep 0.5; alive_http && break; done
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do sleep 0.5; alive_http && break; done
 alive_http || alert "画面を起動できませんでした。ログを確認してください: $LOG"
-# 常駐通知は保存先ごとに1つ。既定ポート以外（＝検証中）は触らない（本番の常駐を殺さない）。
-if [ "$PORT" = "8790" ]; then nohup "$NODE" bin/bump.js daemon --notify osa >>"$LOG" 2>&1 &
-else echo "daemon: 検証ポートなので触らない"; fi
 sleep 1
 
 # 6) 画面を「アプリの窓」として開く（URLバーやタブを見せない）。
