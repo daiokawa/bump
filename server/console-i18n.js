@@ -96,6 +96,8 @@ const I18N_JA = {
  "Unhandled": "未処理",
  "⚠ suspicious: {reason} (review carefully before acting)": "⚠ suspicious: {reason}（行動の前に内容をよく確認）",
  "Quick reply:": "ひとこと返す：",
+ "↩ {line}": "↩ {line}",
+ "↩ Probably re: {line}": "↩ たぶん：{line}",
  "Got it!": "了解！",
  "Thanks!": "ありがと！",
  "Likewise!": "こちらこそ！",

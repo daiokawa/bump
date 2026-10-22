@@ -229,6 +229,8 @@ function renderList(){
   }
 }
 
+// 何への返事か（↩ 元の手紙の冒頭1行）。re の無い旧版からのひとことは推定なので「たぶん」と控えめに。
+function replyLine(r){if(!r||!r.line)return null;const d=el('div','reline'+(r.guessed?' guess':''));d.textContent=r.guessed?tf('↩ Probably re: {line}',{line:r.line}):tf('↩ {line}',{line:r.line});return d;}
 function mainEmpty(emoji,big,sub){const m=$('main');m.textContent='';const e=el('div','m-empty');const em=el('div','emoji');em.textContent=emoji;const b=el('div','big');b.textContent=big;const s=el('div');s.textContent=sub;e.append(em,b,s);m.append(e);}
 async function renderMain(){
   const M=$('main');
@@ -312,6 +314,7 @@ async function renderMain(){
     M.append(mHead(av,(L.label||nm(sel.pair)),ts(L.at),iStat,iCls,()=>openProfile(sel.pair)));
     const body=el('div','m-body');
     if(L.suspicious&&L.suspicious.flag){const w=el('div','flagbar');w.textContent=tf('⚠ suspicious: {reason} (review carefully before acting)',{reason:L.suspicious.reason||''});body.append(w);}
+    const rl=replyLine(L.reply);if(rl)body.append(rl);
     const p=el('div','letter');p.textContent=L.body;body.append(p);
     if(L.inquiries&&L.inquiries.length){const iq=el('div','inqlog');renderInqLines(iq,L.inquiries);body.append(iq);}
     // クイック返信：人間向けの手紙に、打たずに一言返す（そのまま手紙として相手へ飛ぶ）。
@@ -323,7 +326,7 @@ async function renderMain(){
       const done=qrSent.includes(k);
       const b=el('button','quickbtn'+(done?' qsent':''));b.textContent=(done?'✓ ':'')+t(k);
       b.onclick=async()=>{b.disabled=true;
-        await fetch('/api/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:sel.pair,body:t(k)})});
+        await fetch('/api/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:sel.pair,body:t(k),re:sel.id})});
         if(!qrSent.includes(k)){qrSent.push(k);try{localStorage.setItem(qrKey,JSON.stringify(qrSent))}catch{}}
         b.classList.add('qsent');b.textContent='✓ '+t(k);b.disabled=false;};
       qr.append(b);
@@ -363,7 +366,7 @@ async function renderMain(){
           const row=el('div','hist-row'+(m.mine?' mine':''));
           const meta=el('div','hist-meta');meta.textContent=(m.mine?t('Me'):(P.label||nm(sel.pair)))+' · '+d.toLocaleTimeString(LANG==='ja'?'ja-JP':'en-US',{hour:'2-digit',minute:'2-digit'});
           const bt=el('div','hist-body');bt.textContent=(m.body||'').replace(/^【[^】]*】/,'');
-          row.append(meta,bt);listBox.append(row);
+          const hr=replyLine(m.reply);if(hr)row.append(meta,hr,bt);else row.append(meta,bt);listBox.append(row);
         });
         older.disabled=bounds().start===0;newer.disabled=page===0;
         older.style.opacity=older.disabled?'.4':'1';newer.style.opacity=newer.disabled?'.4':'1';
@@ -391,7 +394,7 @@ async function renderMain(){
     M.textContent='';const label={sent:t('Unread'),read:t('✓ Read'),declined:t('✕ Was declined'),unsent:t('↩ Recalled')};
     const av=avaInto(el('div','m-ava'),{avatar:sel.avatar,icon:sel.icon,text:nm(sel.pair).slice(0,2).toUpperCase()});av.style.background=color(sel.pair);
     M.append(mHead(av,tf('To {name}',{name:sel.label||nm(sel.pair)}),ts(sel.at)+' · '+(label[sel.status]||sel.status),undefined,undefined,()=>openProfile(sel.pair)));
-    const body=el('div','m-body');const p=el('div','letter');p.textContent=(sel.body||'').replace(/^【[^】]*】/,'');body.append(p);
+    const body=el('div','m-body');const srl=replyLine(sel.reply);if(srl)body.append(srl);const p=el('div','letter');p.textContent=(sel.body||'').replace(/^【[^】]*】/,'');body.append(p);
     if(sel.status==='declined'&&sel.reason){const r=el('div','inqlog');const line=el('div','inqline');line.textContent=tf('From them: {reason}',{reason:sel.reason});r.append(line);body.append(r);}
     M.append(body);
     // 取り消し＝配達前（中継にまだ在るうち）だけ効く。Unread表示でも相手側に届いて未読の

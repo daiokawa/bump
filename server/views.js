@@ -11,6 +11,7 @@ import { receiveInbox, sendReceipt, receiptsEnabled, readSentStatus, CONTROL_TYP
 const isControl = (m) => CONTROL_TYPES.includes(m.type); // 受領・プロフィール等＝人間の一覧に出さない
 import { pushToRelay, pullAllFromRelay } from '../lib/relay.js';
 import { beat, reachOf } from '../lib/presence.js';
+import { replyOf } from '../lib/reply.js';
 import { screen, skipScreen } from '../lib/guard.js';
 import { warn } from '../lib/log.js';
 import { hasRoom, humanBytes, freeBytes } from '../lib/disk.js';
@@ -179,7 +180,7 @@ export async function pairJson(id, opt = {}) {
     safety: sn.display, visible: !!peer.show_presence, online: reach.online, lastSeen: reach.lastSeen,
     total: all.length, hasMore,
     messages: list.map((m) => ({ id: m.id, mine: m.from === me.device_id, body: m.body,
-      at: m.created_at, suspicious: sc[m.id] || null })),
+      at: m.created_at, suspicious: sc[m.id] || null, reply: replyOf(m, all) })),
   };
 }
 
@@ -213,7 +214,8 @@ export async function letterJson(pairId, id) {
   const sc = await readScreen(pairId);
   let label = pairId, channels = [], peer = null; try { peer = await readPeer(pairId); label = contactLabel(pairId, peer.name, peer.alias, peer.ai); channels = sanitizeChannels(peer.channels); } catch {}
   const inq = await readInquiry(pairId);
-  for (const m of await messagesOf(pairId)) {
+  const msgs = await messagesOf(pairId);
+  for (const m of msgs) {
     if (m.id === id) {
       const fresh = await markOpened(pairId, id); // 開いた＝既読（初回だけ true）
       // 相手の手紙を初めて開いたら、その場で送信者へ「既読」を返す（Applyを待たない＝クリック即時）。
@@ -223,7 +225,7 @@ export async function letterJson(pairId, id) {
         catch (e) { warn(tf('read receipt ({pair})', { pair: pairId }), e); }
       }
       return { pair: pairId, id, at: m.created_at, body: m.body, label, suspicious: sc[id] || null,
-        channels, inquiries: inq[id] || [] }; }
+        channels, inquiries: inq[id] || [], reply: replyOf(m, msgs) }; }
   }
   return { error: 'not found' };
 }
@@ -235,10 +237,11 @@ export async function sentJson() {
   for (const id of await listPairs()) {
     const st = await readSentStatus(id);
     let label = id, avatar = '', icon = ''; try { const peer = await readPeer(id); label = contactLabel(id, peer.name, peer.alias, peer.ai); avatar = peer.avatar || ''; icon = peer.icon || ''; } catch {}
-    for (const m of await messagesOf(id)) {
+    const msgs = await messagesOf(id);
+    for (const m of msgs) {
       if (m.from !== me.device_id || isControl(m)) continue;
       const s = st[m.id]; const status = (s && typeof s === 'object') ? s.status : (s || 'sent'); const reason = (s && typeof s === 'object') ? (s.reason || '') : '';
-      rows.push({ pair: id, id: m.id, at: m.created_at, body: m.body, label, avatar, icon, status, reason });
+      rows.push({ pair: id, id: m.id, at: m.created_at, body: m.body, label, avatar, icon, status, reason, reply: replyOf(m, msgs) });
     }
   }
   return rows.sort((a, b) => (a.at < b.at ? 1 : -1));

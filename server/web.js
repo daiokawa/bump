@@ -12,6 +12,7 @@ import { spawn } from 'node:child_process';
 import { readFile, writeFile, readdir, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validRe } from '../lib/reply.js';
 import { t, tf } from '../lib/i18n.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
@@ -384,7 +385,8 @@ const server = createServer(async (req, res) => {
       const b = await body(req);
       const me = await identity(); const peer = await readPeer(b.id);
       const tag = b.kind ? `【${b.kind}】` : '';
-      const { msg } = await sendMessage({ identity: me, peer, pairId: b.id, body: tag + (b.body || ''), now });
+      const re = validRe(b.re) ? b.re : undefined;   // ひとこと等の返事先（元の手紙の id）
+      const { msg } = await sendMessage({ identity: me, peer, pairId: b.id, body: tag + (b.body || ''), now, re });
       // 投函に失敗しても手紙は自分のoutboxに残る（次のsyncで届く）。ただし黙って成功に見せない。
       let delivered = true;
       try { await pushToRelay({ pairId: b.id, relayDir: RELAY, peerDeviceId: peer.device_id }); }
@@ -433,4 +435,14 @@ if (!(await hasRoom(SELF))) {
   console.error(t('Free up space and start again (stopped to avoid corrupting letters and logs).'));
   process.exit(1);
 }
-server.listen(PORT, process.env.MM_BIND || '127.0.0.1', () => console.log(`bump console:  http://localhost:${PORT}  (self=${SELF})`));
+// 同じポートを先に握っている画面があれば、落ちずに待って引き継ぐ。launchd の登録が2組ある・
+// ラッパー経由などで二重に起動されても、片方は待機に回る（Y.K.報告 2026-10-22）。
+// 落ちると KeepAlive が再起動を繰り返すだけになる。
+let standby = false;
+const listen = () => server.listen(PORT, process.env.MM_BIND || '127.0.0.1', () => console.log(`bump console:  http://localhost:${PORT}  (self=${SELF})`));
+server.on('error', (e) => {
+  if (e.code !== 'EADDRINUSE') throw e;
+  if (!standby) { console.log(tf('bump console: port {port} is already in use (another console is running) — standing by', { port: PORT })); standby = true; }
+  setTimeout(listen, 60_000);
+});
+listen();

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-22
+
+- **A quick reply now says what it is replying to.** "Thanks!" or "Likewise!" on their own don't tell you which letter they answer. A quick reply now carries the id of the letter it answers (`re`, inside the signed message), and the console, the conversation history, your sent letters and `bump_read` show "↩" with the first line of that letter. Quick replies from older versions carry no `re`; for those, the letter you sent just before is shown as a modest "↩ Probably re: …". voice-code's quick-reply buttons send the same `re`. Older versions receiving a letter with `re` read and verify it as before.
+- **The watcher and the console can no longer run twice for one end, however they were started.** Yesterday's fix told your own launchd jobs apart by looking for `server/web.js` / `bump.js daemon` in their arguments, which misses jobs that start bump through a wrapper script — so both sets started at login (Y.K.). Now the running processes decide: the watcher holds a lock (`~/.bump/daemon.lock`) and a second one waits quietly, taking over if the first stops; a second console finding the port in use waits instead of crashing.
+
 ## 2026-10-21
 
 - **The background watcher now checks the relay once a minute, in one request.** It used to ask every 5 seconds, and once per contact — but your relay mailbox is a single box addressed to you, so a machine with 8 contacts read the same box 8 times every 5 seconds. Measured on 10-18: about 282,000 requests a day across the relay, half of them from one machine. The watcher now pulls the box once and sorts letters to each contact (the same path the console already used), and the default interval is 60 seconds. bump is a tool for letters people read and think over with their local AI; a minute's delay is shorter than that conversation. `bump daemon --every <ms>` still overrides. Opening the console still pulls immediately, as before.

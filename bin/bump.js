@@ -41,6 +41,7 @@ import { pushToRelay, pullFromRelay, pullAllFromRelay } from '../lib/relay.js';
 import { callLocalAI } from '../lib/agent.js';
 import { tmuxNotify, osaNotify, chatworkNotify } from '../lib/notify.js';
 import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
+import { takeDaemonLock, ownsDaemonLock } from '../lib/single.js';
 import { t, tf } from '../lib/i18n.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));   // 専用パッケージに焼き込まれた物を読む用
@@ -352,7 +353,12 @@ async function cmdDaemon(flags) {
     } catch {}
   };
 
+  // 1つの端に常駐は1つ。既に動いていれば待機し、止まったら引き継ぐ。
+  const standby = (pid) => out(tf('bump daemon: another watcher (pid {pid}) is already running for this end — standing by', { pid }));
+  await takeDaemonLock({ onWait: standby });
   for (;;) {
+    // 同時起動の競り合いで両方が取った気になった場合も、ここで片方が待機に戻る。
+    if (!(await ownsDaemonLock())) await takeDaemonLock({ onWait: standby });
     await checkUpdate();
     // 中継の受信箱は自分宛の1つ。縁ごとに /get すると同じ箱を縁の数だけ読むので、1回で取って振り分ける。
     const pairIds = await listPairs(), peers = {}, peersOf = {};
