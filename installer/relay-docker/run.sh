@@ -8,7 +8,7 @@ set -euo pipefail
 export DOCKER_CONTEXT="${DOCKER_CONTEXT:-colima-bump}"   # 専用プロファイル（VMに見せるのも relaybox だけ）
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 BOX="${MM_RELAYBOX:-$HOME/.bump/relaybox}"
-docker build -q -t bump-relay -f "$REPO/installer/relay-docker/Dockerfile" "$REPO" >/dev/null
+docker build -q --pull -t bump-relay -f "$REPO/installer/relay-docker/Dockerfile" "$REPO" >/dev/null
 docker rm -f bump-relay >/dev/null 2>&1 || true
 docker run -d --name bump-relay --restart unless-stopped \
   --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
