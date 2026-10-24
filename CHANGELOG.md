@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-25
+
+- **A letter with a malformed id or sender can no longer write outside your inbox or stop delivery.** The relay accepts any text as a letter's id and sender, and your side used the id directly as a file name. Someone who knows your address could therefore have bump create a `.env.json` file in another folder you can write to (an existing file is never overwritten), or, by naming a built-in property as the sender, make every pull fail at that letter so later letters stopped arriving until it expired. Your side now places only letters whose id is a plain token (real ids are always random UUIDs) and whose sender is one of your own contacts; anything else is skipped and the rest of the mailbox is delivered. Message contents were never at risk: letters are still opened and verified end to end. Found in a security review of the relay; installs pick this up on the next app open.
+
 ## 2026-10-24
 
 - **Dependencies updated: `npm audit` is clean again.** `@modelcontextprotocol/sdk` 1.32.1 → 1.32.2 (zod 4.4.3 → 4.6.7), clearing a high-severity zod advisory where validating an oversized set could exhaust memory. bump only uses the SDK over stdio and the relay does not depend on it, so the practical exposure was low. Installs pick this up on the next app open.
