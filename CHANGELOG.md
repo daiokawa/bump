@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-24
+
+- **Dependencies updated: `npm audit` is clean again.** `@modelcontextprotocol/sdk` 1.32.1 → 1.32.2 (zod 4.4.3 → 4.6.7), clearing a high-severity zod advisory where validating an oversized set could exhaust memory. bump only uses the SDK over stdio and the relay does not depend on it, so the practical exposure was low. Installs pick this up on the next app open.
+
 ## 2026-10-22
 
 - **A quick reply now says what it is replying to.** "Thanks!" or "Likewise!" on their own don't tell you which letter they answer. A quick reply now carries the id of the letter it answers (`re`, inside the signed message), and the console, the conversation history, your sent letters and `bump_read` show "↩" with the first line of that letter. Quick replies from older versions carry no `re`; for those, the letter you sent just before is shown as a modest "↩ Probably re: …". voice-code's quick-reply buttons send the same `re`. Older versions receiving a letter with `re` read and verify it as before.
