@@ -23,6 +23,13 @@ const MAX_ENV_BYTES = 1024 * 1024;     // envelope 1件の上限（seed=ソフ�
 const MAX_PER_ROUTING = 500;           // routing_id ごとの保持件数（超えたら古いものから消す）
 const TTL_MS = 7 * 24 * 60 * 60 * 1000; // 保持期間（相手が長く寝ていても届くよう1週間）
 const RATE_MAX = 240, RATE_WINDOW_MS = 60 * 1000;
+// 1回の /get で返す量の上限。受信箱を丸ごと読むと 500通×1MB がメモリに載り、128MBの檻ごと落ちる。
+// 残りは受け取る側が次の取り込みで cursor から続きを取りに来る（受け取る側の変更は要らない）。
+const GET_MAX_ITEMS = 100, GET_MAX_BYTES = 4 * 1024 * 1024;
+// 同時に抱える本文・読み出しの合計の上限。超えたら503で断る（1件ずつの上限だけだと、同時接続で積み上がる）。
+const INFLIGHT_MAX = 24 * 1024 * 1024;
+let inflight = 0;
+const SWEEP_EVERY_MS = 60 * 60 * 1000;   // 全受信箱の定期掃除（触られない受信箱にもTTLを効かせる）
 
 const rate = new Map();
 const nowMs = () => Date.now();
@@ -63,20 +70,42 @@ async function lastServedOf(rid) {
 }
 
 // TTL・件数超過の掃除（ディスク）。
-async function sweep(rid) {
+async function sweep(rid, room = 0) {   // room: これから入れる件数ぶんの空きを作る
   const dir = ridDir(rid);
   let files = (await listFiles(rid)).sort((a, b) => seqOf(a) - seqOf(b));
   const t = nowMs();
   for (const f of [...files]) {
     try { const st = await stat(join(dir, f)); if (t - st.mtimeMs > TTL_MS) { await unlink(join(dir, f)).catch(() => {}); files = files.filter((x) => x !== f); } } catch {}
   }
-  while (files.length > MAX_PER_ROUTING) { const f = files.shift(); await unlink(join(dir, f)).catch(() => {}); }
+  // 件数超過で消してよいのは配達済み（served以下）だけ。未配達まで古い順に消すと、宛先を知る誰かが
+  // 500通送るだけで本物の手紙が黙って消える（2026-10-25 監査 run-1）。未配達で満杯なら /put が断る。
+  const served = await lastServedOf(rid);
+  while (files.length > MAX_PER_ROUTING - room && seqOf(files[0]) <= served) { const f = files.shift(); await unlink(join(dir, f)).catch(() => {}); }
+  return files.length;
 }
 
-async function readBody(req, cap) {
+async function sweepAll() {
+  let rids = [];
+  try { rids = (await readdir(BOX)).filter(validRid); } catch { return; }
+  for (const rid of rids) await sweep(rid).catch(() => {});
+  const t = nowMs();
+  for (const m of [rate, ridRate]) for (const [k, v] of m) if (v.resetAt < t) m.delete(k);   // 数え表も溜めない
+}
+
+// hold.n に抱えたバイト数を積む（全体の inflight にも足す）。返すのはハンドラの finally。
+async function readBody(req, cap, hold) {
+  // 申告サイズで先に断る（本文を読み始めてから断っても、読んだ分はGCまでメモリに残る）
+  const cl = Number(req.headers['content-length']);
+  if (cl > cap) { req.destroy(); throw new Error('too large'); }
+  if (cl > 0 && inflight + cl > INFLIGHT_MAX) { req.destroy(); throw new Error('busy'); }
   return new Promise((resolve, reject) => {
-    let n = 0; const chunks = []; const to = setTimeout(() => reject(new Error('body timeout')), 15000);
-    req.on('data', (c) => { n += c.length; if (n > cap) { clearTimeout(to); reject(new Error('too large')); req.destroy(); return; } chunks.push(c); });
+    let n = 0; const chunks = []; const to = setTimeout(() => { reject(new Error('body timeout')); req.destroy(); }, 15000);
+    req.on('data', (c) => {
+      n += c.length; hold.n += c.length; inflight += c.length;
+      if (n > cap) { clearTimeout(to); reject(new Error('too large')); req.destroy(); return; }
+      if (inflight > INFLIGHT_MAX) { clearTimeout(to); reject(new Error('busy')); req.destroy(); return; }
+      chunks.push(c);
+    });
     req.on('end', () => { clearTimeout(to); resolve(Buffer.concat(chunks).toString('utf8')); });
     req.on('error', (e) => { clearTimeout(to); reject(e); });
   });
@@ -92,6 +121,7 @@ const server = createServer(async (req, res) => {
   // Docker の中では同じ Funnel 経由の接続がブリッジのゲートウェイIPから来るので、MM_BEHIND_PROXY=1 で同じ扱いにする。
   const loopback = process.env.MM_BEHIND_PROXY === '1' || ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
   if (!loopback && !rateOk(ip)) return json(res, 429, { error: 'rate' });
+  const hold = { n: 0 };
   try {
     // Funnel 越し(=外)には / と /health も知らない道も返事をせず切る。スキャナーには何も無いのと同じに見せる。
     // 動作確認は手元(ループバック/tailnet)からだけ。box(保存先パス)も返さない (2026-10-21 スキャナー来訪で発覚)
@@ -100,7 +130,7 @@ const server = createServer(async (req, res) => {
 
     // 投函: {to_routing_id, envelope} を宛先メールボックスへ追記（seqはディスク連番＝再起動でも継続）。
     if (url.pathname === '/put' && req.method === 'POST') {
-      const raw = await readBody(req, MAX_ENV_BYTES + 4096);
+      const raw = await readBody(req, MAX_ENV_BYTES + 4096, hold);
       let p; try { p = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad json' }); }
       const rid = p.to_routing_id, env = p.envelope;
       if (!validRid(rid)) return json(res, 400, { error: 'bad routing_id' });
@@ -111,6 +141,7 @@ const server = createServer(async (req, res) => {
       if (Buffer.byteLength(JSON.stringify(env), 'utf8') > MAX_ENV_BYTES) return json(res, 413, { error: 'envelope too large' });
       if (!(await hasRoom(BOX))) return json(res, 507, { error: 'insufficient storage' }); // 預かれないなら断る
       const dir = ridDir(rid); await mkdir(dir, { recursive: true });
+      if ((await sweep(rid, 1)) >= MAX_PER_ROUTING) return json(res, 429, { error: 'mailbox full' }); // 未配達で満杯＝押し出さずに断る
       const files = await listFiles(rid);
       const eid = safeId(env.envelope_id);
       const dup = files.find((f) => idOf(f) === eid);
@@ -129,12 +160,20 @@ const server = createServer(async (req, res) => {
       if (!validRid(rid)) return json(res, 400, { error: 'bad routing_id' });
       await sweep(rid);
       const picked = (await listFiles(rid)).map((f) => ({ seq: seqOf(f), f })).filter((x) => x.seq > after).sort((a, b) => a.seq - b.seq);
-      const items = [];
-      for (const x of picked) { try { items.push({ seq: x.seq, envelope: JSON.parse(await readFile(join(ridDir(rid), x.f), 'utf8')) }); } catch {} }
-      const cursor = picked.length ? picked[picked.length - 1].seq : after;
+      const items = []; let bytes = 0, last = null;
+      for (const x of picked) {
+        if (items.length >= GET_MAX_ITEMS) break;
+        let text; try { text = await readFile(join(ridDir(rid), x.f), 'utf8'); } catch { last = x; continue; }
+        const b = Buffer.byteLength(text);
+        if (items.length && bytes + b > GET_MAX_BYTES) break;          // 1通目だけは大きくても渡す（1MBの配布物）
+        if (inflight + b > INFLIGHT_MAX) { if (!items.length) return json(res, 503, { error: 'busy' }); break; }
+        bytes += b; hold.n += b; inflight += b; last = x;
+        try { items.push({ seq: x.seq, envelope: JSON.parse(text) }); } catch {}
+      }
+      const cursor = last ? last.seq : after;                          // 返した所まで。続きは次の取り込みで
       // 手渡した事実を記録（応答が途中で落ちても受信側cursorは進まず再取得できる＝
       // servedは配達を止めない。unsendの可否判定だけに使う。安全側＝渡したかもしれないら渡した扱い）。
-      if (picked.length) {
+      if (last) {
         const served = Math.max(await lastServedOf(rid), cursor);
         await writeFile(servedStatePath(rid), String(served), 'utf8').catch(() => {});
       }
@@ -148,7 +187,7 @@ const server = createServer(async (req, res) => {
     // 相手が既にpull済みなら何も起きない（removed:false）＝取り消せるのは配達前だけ。
     // seqファイルは決して触らない（欠番はcursor方式が自然に飛ばす。巻き戻し禁止は不変条件）。
     if (url.pathname === '/unsend' && req.method === 'POST') {
-      const raw = await readBody(req, 16 * 1024);
+      const raw = await readBody(req, 16 * 1024, hold);
       let p; try { p = JSON.parse(raw); } catch { return json(res, 400, { error: 'bad json' }); }
       const rid = p.to_routing_id;
       if (!validRid(rid)) return json(res, 400, { error: 'bad routing_id' });
@@ -167,7 +206,12 @@ const server = createServer(async (req, res) => {
     }
     return fromFunnel ? req.socket.destroy() : json(res, 404, { error: 'not found' });
   } catch (e) {
-    return json(res, e.message === 'too large' ? 413 : 400, { error: e.message });
+    // e.message をそのまま返すと、fs の失敗でホストのパスが漏れる。決まった言葉だけ返す。
+    const known = { 'too large': 413, 'busy': 503, 'body timeout': 408 }[e.message];
+    if (!known) console.error('bump relay:', e.message);
+    return res.headersSent ? undefined : json(res, known || 400, { error: known ? e.message : 'bad request' });
+  } finally {
+    inflight -= hold.n;
   }
 });
 
@@ -180,4 +224,5 @@ if (!(await hasRoom(BOX))) {
 }
 // localhostのみにbind。外への公開は Tailscale Funnel が 127.0.0.1 へプロキシする形で行う
 // （＝node自身は外向きポートを開かない。firewallダイアログ回避＋攻撃面の縮小。MM_BINDで上書き可）。
+sweepAll(); setInterval(sweepAll, SWEEP_EVERY_MS).unref();
 server.listen(PORT, process.env.MM_BIND || '127.0.0.1', () => console.log(`bump relay:  http://localhost:${PORT}  (disk永続 box=${BOX})`));
