@@ -15,7 +15,7 @@ import { mkdir, readdir, readFile, writeFile, unlink, stat } from 'node:fs/promi
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
-import { verifyUnsendClaim } from '../lib/crypto.js';
+import { verifyUnsendClaim, verifyGetClaim } from '../lib/crypto.js';
 
 const PORT = Number(process.argv[2]) || 8791;
 const BOX = process.env.MM_RELAYBOX || join(process.env.BUMP_HOME || join(homedir(), '.bump'), 'relaybox');
@@ -158,6 +158,14 @@ const server = createServer(async (req, res) => {
       const rid = url.searchParams.get('routing_id');
       const after = Number(url.searchParams.get('after') || 0);
       if (!validRid(rid)) return json(res, 400, { error: 'bad routing_id' });
+      // 受信箱を開けるのは鍵の持ち主だけ（x-bump-auth＝自分の鍵で署名した要求）。署名が付いていれば必ず確かめる。
+      // 署名なしは移行期間だけ通す。全員が署名付きの版になったら MM_REQUIRE_SIGNED_GET=1 で断る（2026-10-25 監査 run-1）。
+      const auth = req.headers['x-bump-auth'];
+      if (auth) {
+        let claim; try { claim = JSON.parse(Buffer.from(String(auth).slice(0, 4096), 'base64').toString('utf8')); } catch {}
+        const chk = verifyGetClaim(claim, rid, new Date().toISOString());
+        if (!chk.ok) return json(res, 401, { error: `bad auth: ${chk.reason}` });
+      } else if (process.env.MM_REQUIRE_SIGNED_GET === '1') return json(res, 401, { error: 'signature required' });
       await sweep(rid);
       const picked = (await listFiles(rid)).map((f) => ({ seq: seqOf(f), f })).filter((x) => x.seq > after).sort((a, b) => a.seq - b.seq);
       const items = []; let bytes = 0, last = null;
