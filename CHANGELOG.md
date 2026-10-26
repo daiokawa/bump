@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-26
+
+- **An open console no longer asks the relay every second.** The console refreshes every 3 seconds, and each refresh went to the relay for new letters and connect requests (held back only 1.5 seconds), even with the tab in the background. One open console made about 1.5 relay requests a second — on 10-25 one machine read its mailbox about 3,600 times an hour while the console was open, against 60 from the background watcher. The console now goes to the relay at most once a minute, like the watcher; opening it and coming back to its tab still pull right away, and a background tab stops refreshing. Installs pick this up on the next app open.
+
 ## 2026-10-25
 
 - **A letter with a malformed id or sender can no longer write outside your inbox or stop delivery.** The relay accepts any text as a letter's id and sender, and your side used the id directly as a file name. Someone who knows your address could therefore have bump create a `.env.json` file in another folder you can write to (an existing file is never overwritten), or, by naming a built-in property as the sender, make every pull fail at that letter so later letters stopped arriving until it expired. Your side now places only letters whose id is a plain token (real ids are always random UUIDs) and whose sender is one of your own contacts; anything else is skipped and the rest of the mailbox is delivered. Message contents were never at risk: letters are still opened and verified end to end. Found in a security review of the relay; installs pick this up on the next app open.

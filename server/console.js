@@ -32,8 +32,8 @@ async function loadList(){
   else if(section==='sent')cache.sent=await (await fetch('/api/sent')).json();
   renderList();
 }
-async function refreshBadge(){
-  try{const inb=await (await fetch('/api/inbox')).json();cache.inbox=inb;
+async function refreshBadge(fresh){
+  try{const inb=await (await fetch('/api/inbox'+(fresh?'?fresh=1':''))).json();cache.inbox=inb;
     const unread=inb.filter(x=>x.unread!==false && !x.triage).length; // 未処理の未読だけバッジに
     const b=$('inboxBadge');if(unread){b.style.display='';b.textContent=unread;}else b.style.display='none';
     // バッジを押したら未読へ飛ぶ。一覧が長いと未読が下に埋もれて「数字が消えない」と見える
@@ -157,8 +157,8 @@ async function refreshPackages(){
   });
 }
 // 接続リクエスト（承認する着信）。承認するまで縁にならない＝入口の人間ゲート。
-async function refreshPending(){
-  let list=[];try{list=await (await fetch('/api/pending')).json();}catch{return;}
+async function refreshPending(fresh){
+  let list=[];try{list=await (await fetch('/api/pending'+(fresh?'?fresh=1':''))).json();}catch{return;}
   cache.pending=list;
   const box=$('pendingBox');box.textContent='';
   if(!list.length){box.style.display='none';if(sel&&sel.type==='pending'){sel=null;renderMain();}return;}
@@ -414,7 +414,9 @@ async function renderMain(){
 }
 
 
-loadList();renderMain();refreshBadge();renderMe();refreshPending();refreshHealth();refreshPackages();
-setInterval(()=>{if(!document.querySelector('.scrim.on')){refreshBadge();refreshPending();refreshHealth();refreshPackages();}},3000);
+loadList();renderMain();refreshBadge(true);renderMe();refreshPending(true);refreshHealth();refreshPackages();
+// 裏に回っている間は止める。戻った時は待たずに中継から取る（サーバは普段60秒に1回しか行かない）
+setInterval(()=>{if(!document.hidden&&!document.querySelector('.scrim.on')){refreshBadge();refreshPending();refreshHealth();refreshPackages();}},3000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){refreshBadge(true);refreshPending(true);}});
 
 

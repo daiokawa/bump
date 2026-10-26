@@ -103,9 +103,12 @@ async function messagesOf(pairId) {
 }
 
 // relayから取り込む（新着反映）。取り込みは全体で1回、差出人ごとに振り分ける。
-// 短時間に何度も呼ばれる（画面のポーリング）ので、少しの間は結果を使い回す。
+// 画面は3秒ごとに呼ぶが、中継へ行くのは常駐と同じ60秒に1回まで（1.5秒だった頃は
+// 画面を開いたままの端末が1秒に1回中継を叩いていた 2026-10-26）。開いた時・タブに
+// 戻った時だけ freshPull() で待たずに取りに行く。
 let pullPromise = null, pulledAt = 0;
-const PULL_INTERVAL_MS = 1500;
+export const PULL_INTERVAL_MS = 60_000;
+export function freshPull() { pulledAt = 0; }
 async function pullAll() {
   if (pullPromise) return pullPromise;                       // 同時呼び出しは1回にまとめる
   if (Date.now() - pulledAt < PULL_INTERVAL_MS) return null;  // 直後の連打は素通り

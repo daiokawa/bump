@@ -40,7 +40,9 @@ const { receiveConnectRequests, listPending, readPending, dropPending, sendConne
 const { matchInvite, markInviteUsed, inviteConflict } = await import('../lib/invite.js');
 // データ層（サイドカー保存＋画面用JSONビュー）。BUMP_HOME 設定後に読み込む。
 const { identity, stateJson, pairJson, inboxJson, letterJson, sentJson,
-  markTriage, addInquiry, sanitizeChannels, carryLocalPeer, contactLabel, OPEN_SCHEMES } = await import('./views.js');
+  markTriage, addInquiry, sanitizeChannels, carryLocalPeer, contactLabel, OPEN_SCHEMES,
+  PULL_INTERVAL_MS, freshPull } = await import('./views.js');
+let pendingAt = 0;   // 接続リクエストを最後に中継へ取りに行った時刻
 
 const now = () => new Date().toISOString();
 // 既存の縁と鍵が違う時の案内。黙って繋ぎ直さない（拒否は残す）が、次に何をすればいいかは言う。
@@ -95,6 +97,8 @@ const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'applic
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
+  // 画面を開いた時・タブに戻った時の ?fresh=1 は間隔を待たずに中継へ取りに行く
+  if (url.searchParams.has('fresh')) { freshPull(); pendingAt = 0; }
   try {
     // 状態を変える要求は同一オリジンのみ（上のsameOriginOnlyの説明を参照）
     if (req.method !== 'GET' && req.method !== 'HEAD' && !sameOriginOnly(req)) {
@@ -172,7 +176,11 @@ const server = createServer(async (req, res) => {
     // 承認待ちの一覧。呼ばれるたびにrelayから新しい申請を取り込む（署名検証はconnect.js側）。
     if (url.pathname === '/api/pending') {
       const me = await identity();
-      await receiveConnectRequests({ myDeviceId: me.device_id, relayDir: RELAY, now }).catch(warner(t('receiving connect requests')));
+      // 中継へ行くのは60秒に1回まで（手紙の取り込みと同じ間隔。views.js の pullAll を参照）
+      if (Date.now() - pendingAt >= PULL_INTERVAL_MS) {
+        pendingAt = Date.now();
+        await receiveConnectRequests({ myDeviceId: me.device_id, relayDir: RELAY, now }).catch(warner(t('receiving connect requests')));
+      }
       const list = await listPending();
       // 同じ名前の縁が別の鍵で既にある＝鍵が変わった（入れ直し等）か、同名の別人。承認の前に見せる。
       for (const rec of list) {
