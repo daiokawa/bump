@@ -37,13 +37,22 @@ Don't take our word for any of this. **[AUDIT.md](./AUDIT.md)** is a step-by-ste
 Honesty about limits beats confidence about strengths.
 
 - **A compromised device.** Keys and decrypted letters live as plain files under `~/.bump`. Backups, Spotlight, other users, and other AI tools on the same machine can read them. End-to-end encryption protects the road, not the house.
-- **Metadata at the relay.** The relay never sees letter contents, but it sees which device wrote to which, when, and how much. Anonymizing routing IDs is on the roadmap, not in the product.
+- **Metadata at the relay — at every relay you use.** A relay never sees letter contents, but it sees which device wrote to which, when, and how much. You can now use several relays in parallel (below); each letter goes to all of them, so **each relay's operator sees that metadata**. More relays means fewer single points of failure and more parties holding the who-wrote-to-whom record. Only add relays run by people you trust with that record. Anonymizing routing IDs is on the roadmap, not in the product.
 - **Bond names at the relay are guessable.** `pairTag()` in `lib/crypto.js` folds the bond name with a plain unsalted SHA-256. Anyone holding a list of plausible names can brute-force it back. The comment in that file claims the name is hidden; it is not. Salting this changes every routing ID on the relay, so it needs both ends to upgrade together — it is on the roadmap, not done.
 - **One command does auto-reply.** `rally --serve` hands incoming letters to your local AI and answers without you. Nothing starts it — not `init`, `npm ci`, `up.sh`, launchd, the web UI or MCP — but it exists, and it contradicts "a human decides, every time". Don't point it at a real correspondent. See [AUDIT.md](./AUDIT.md) §5.
 - **Invite codes prove possession, not identity.** A code baked into a package proves the request came from a machine holding that package. If the package was forwarded or copied, the holder is not the person you handed it to. Duplicate use triggers a warning — detection, not prevention.
 - **Signing covers the download, not the running code.** Apple's signature and notarization vouch for the `.app` at the moment you open it. The code it installs to `~/.bump-app` — and anything auto-update later overlays from GitHub — runs outside that seal; its trust rests on HTTPS and GitHub. Release signatures with our own key are on the roadmap to close this gap.
 - **Release signing protects the pipe, not the key.** Auto-update now refuses code that is not signed with our Ed25519 key. That closes the "someone takes over the repository" path. It does not help if the signing key itself leaks from the maintainer's machine — the same house-versus-road limit as above.
-- **A single operator.** Today there is one relay, one repository, one signing key. If you need to not depend on us, self-host the relay — the code is all here.
+- **A single operator.** Today there is one repository and one signing key. Relays no longer need to be single: run your own and add it alongside ours (see [docs/relay-setup.md](./docs/relay-setup.md)).
+
+## Relays in parallel
+
+bump can use several relays at once. Sending puts the same sealed envelope on every relay; receiving reads every relay and drops duplicates by envelope id. As long as any one relay is up, letters get through — no coordination between relays is needed, because envelopes are already signed and end-to-end encrypted.
+
+- The list is `MM_RELAY_URL` (one or more, space-separated) plus `~/.bump/relays.txt` (one per line). `bump relays` shows it; `bump relays add|remove <url>` edits the file.
+- A send succeeds once any relay accepts it; relays that were down get it later from the outbox (given up after the relays' 7-day limit).
+- Taking a letter back is sent to every relay that holds it, and reports success only if all of them removed it.
+- Someone on an older, single-relay version still reaches you as long as their relay is on your list.
 
 ## Run
 

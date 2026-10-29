@@ -44,6 +44,8 @@ rsync -a --exclude .git --exclude /dist --exclude '*.log' --exclude .playwright-
 MMHOME="${BUMP_HOME:-$HOME/.bump}"
 TOKEN="$(BUMP_HOME="$MMHOME" node bin/bump.js invite "$LABEL")"
 printf '%s' "$RELAY_URL" > "$APP/Contents/Resources/repo/relay-url.default"
+# 追加の中継（並列）。MM_EXTRA_RELAYS="https://... https://..." で渡すと、受け取った人の一覧に入る。
+[ -n "${MM_EXTRA_RELAYS:-}" ] && printf '%s\n' $MM_EXTRA_RELAYS > "$APP/Contents/Resources/repo/relays.default"
 printf '%s' "$LABEL"     > "$APP/Contents/Resources/repo/recipient.txt"
 printf '%s' "$TOKEN"     > "$APP/Contents/Resources/repo/invite-token"
 # 配る側の公開鍵も焼き込む＝初回起動で接続リクエストまで自動で飛ぶ（貼り付ける文が要らない）。
@@ -90,7 +92,7 @@ rm -rf "$APP"
 
 echo "できました:"
 echo "  dist/bump-$SLUG.zip   ← これを $LABEL さんに渡す"
-echo "  relay(焼込): $RELAY_URL"
+echo "  relay(焼込): $RELAY_URL${MM_EXTRA_RELAYS:+ ＋追加 $MM_EXTRA_RELAYS}"
 echo "  宛先(系統):  $LABEL"
 echo "  合言葉:      焼込済（承認画面で自動照合されます）"
 du -h "$ROOT/dist/bump-$SLUG.zip" | awk '{print "  size: " $1}'

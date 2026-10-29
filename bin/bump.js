@@ -42,6 +42,7 @@ import { callLocalAI } from '../lib/agent.js';
 import { tmuxNotify, osaNotify, chatworkNotify } from '../lib/notify.js';
 import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
 import { takeDaemonLock, ownsDaemonLock } from '../lib/single.js';
+import { relayUrls, editRelays } from '../lib/relays.js';
 import { t, tf } from '../lib/i18n.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));   // 専用パッケージに焼き込まれた物を読む用
@@ -545,6 +546,13 @@ function parseFlags(argv) {
   return { flags, rest };
 }
 
+// 中継の一覧（並列）。送るときは全部に置き、受けるときは全部から取る。
+async function cmdRelays(op, url) {
+  if (op === 'add' || op === 'remove') { if (!url) die('usage: bump relays add|remove <https://...>'); await editRelays(op, url); }
+  const env = String(process.env.MM_RELAY_URL || '').split(/[\s,]+/).filter(Boolean).map((u) => u.replace(/\/+$/, ''));
+  for (const u of relayUrls()) out(`${u}${env.includes(u) ? '  (MM_RELAY_URL)' : ''}`);
+}
+
 async function main() {
   const [cmd, ...raw] = process.argv.slice(2);
   const { flags, rest } = parseFlags(raw);
@@ -573,9 +581,10 @@ async function main() {
     case 'read': return cmdRead(rest[0], rest[1]);
     case 'log': return cmdLog(rest[0], flags);
     case 'pairs': return cmdPairs();
+    case 'relays': return cmdRelays(rest[0], rest[1]);
     default:
       out(t('bump — a trusted path between local AIs (a zero-permission mail exchange)'));
-      out('commands: init | id | device | version | invite | engage | request | safety | verify | send | package | packages | deliver | sync | watch | daemon | receive | rally | read | log | pairs');
+      out('commands: init | id | device | version | invite | engage | request | safety | verify | send | package | packages | deliver | sync | watch | daemon | receive | rally | read | log | pairs | relays');
       if (cmd) process.exit(1);
   }
 }

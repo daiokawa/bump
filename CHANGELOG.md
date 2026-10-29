@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Relays in parallel.** bump can now use several relays at once: sending puts the same sealed envelope on every relay, receiving reads every relay and drops duplicates, so letters get through as long as any one relay is up — no single machine has to stay on for everyone. The list is `MM_RELAY_URL` plus `~/.bump/relays.txt` (`bump relays add|remove <url>`); cursors are kept per relay, and your existing position carries over to the first one. A send succeeds once any relay accepts it, and relays that were down get it later from the outbox. Taking a letter back goes to every relay that holds it and reports success only if all removed it. Connect requests arriving once per relay show up once. Older single-relay versions keep working with you as long as their relay is on your list. **Every relay you add sees who writes to whom and when** (never the contents), so add only relays whose operators you trust with that; how to run one is in `docs/relay-setup.md`.
+
 ## 2026-10-26
 
 - **An open console no longer asks the relay every second.** The console refreshes every 3 seconds, and each refresh went to the relay for new letters and connect requests (held back only 1.5 seconds), even with the tab in the background. One open console made about 1.5 relay requests a second — on 10-25 one machine read its mailbox about 3,600 times an hour while the console was open, against 60 from the background watcher. The console now goes to the relay at most once a minute, like the watcher; opening it and coming back to its tab still pull right away, and a background tab stops refreshing. Installs pick this up on the next app open.

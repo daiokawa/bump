@@ -139,6 +139,11 @@ if [ ! -f "$URLFILE" ]; then
   fi
 fi
 RELAY_URL="$(cat "$URLFILE" 2>/dev/null)"
+# 2つ目以降の中継（並列。送るときは全部に置き、受けるときは全部から取る）。パッケージに焼き込まれた
+# 追加分は、手元の一覧がまだ無いときだけ写す（利用者が後で外した中継を開くたびに戻さない）。
+if [ -s "$DEST/relays.default" ] && [ ! -f "$MIDHOME/relays.txt" ]; then
+  cp "$DEST/relays.default" "$MIDHOME/relays.txt"; echo "relays: 焼き込みの追加中継を登録"
+fi
 [ -f "$DEST/recipient.txt" ] && echo "recipient: $(cat "$DEST/recipient.txt")"  # 系統: 誰宛のパッケージか
 export BUMP_HOME="$MIDHOME" MM_SELF="$MIDHOME" MM_RELAY="$RELAY"
 [ -n "$RELAY_URL" ] && export MM_RELAY_URL="$RELAY_URL"
