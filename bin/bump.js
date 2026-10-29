@@ -43,6 +43,7 @@ import { tmuxNotify, osaNotify, chatworkNotify } from '../lib/notify.js';
 import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
 import { takeDaemonLock, ownsDaemonLock } from '../lib/single.js';
 import { relayUrls, editRelays } from '../lib/relays.js';
+import { handleConnectRequests } from '../lib/connect.js';
 import { t, tf } from '../lib/i18n.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));   // 専用パッケージに焼き込まれた物を読む用
@@ -366,7 +367,10 @@ async function cmdDaemon(flags) {
     for (const pairId of pairIds) {
       try { const p = await readPeer(pairId); peers[pairId] = p; peersOf[p.device_id] = pairId; } catch {}
     }
-    if (relayDir) await pullAllFromRelay({ relayDir, myDeviceId: id.device_id, peersOf }).catch(() => {});
+    // 同じ受信箱に来た接続リクエストも拾う（招待リンクから来たものは承認なしで縁になる＝画面を開いていなくても）。
+    const reqs = [];
+    if (relayDir) await pullAllFromRelay({ relayDir, myDeviceId: id.device_id, peersOf, onConnect: (b) => { reqs.push(b); } }).catch(() => {});
+    if (reqs.length) await handleConnectRequests(reqs, { myDeviceId: id.device_id, relayDir, now }).catch(() => {});
     for (const pairId of pairIds) {
       const peer = peers[pairId]; if (!peer) continue;
       const p = pairPaths(pairId);

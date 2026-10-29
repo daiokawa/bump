@@ -57,11 +57,15 @@ bump can use several relays at once. Sending puts the same sealed envelope on ev
 ## Run
 
 ```sh
+git clone https://github.com/daiokawa/bump.git && cd bump
 npm ci --omit=dev   # not `npm install` — see below
+node bin/bump.js relays add https://<relay address>   # get this from the person inviting you
 bash up.sh          # relay (8791) + console (8790) + notifications
 bash open-app.sh    # open the console window
 bash up.sh stop
 ```
+
+**Connecting to someone:** one of you opens *Add contact* in the console and sends the invite link (valid 5 minutes); the other opens it in a browser on their own Mac. That is all — the link carries a one-time code, so the person who made it is connected automatically within a minute. You both need to be on at least one common relay (that is what the `relays add` line is for).
 
 Use `npm ci`, not `npm install`. The latter rewrites `package-lock.json`, which is part of
 the signed content, so `bump verify-release` will then correctly report a mismatch (H.S.,

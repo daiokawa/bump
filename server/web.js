@@ -28,7 +28,7 @@ const { pairPaths } = await import('../lib/paths.js');
 const { engagePeer, markConfirmed, carryConfirmation } = await import('../lib/pairing.js');
 const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage, unsendMessage } = await import('../lib/exchange.js');
 const { buildPackage, listPackages, discardPackage, MAX_PAYLOAD_BYTES } = await import('../lib/package.js');
-const { pushToRelay } = await import('../lib/relay.js');
+const { pushToRelay, replayStrays } = await import('../lib/relay.js');
 const { signedBundle, verifyBundle } = await import('../lib/crypto.js');
 const { listClaudeSessions } = await import('../lib/sessions.js');
 const { tmuxNotify } = await import('../lib/notify.js');
@@ -37,7 +37,7 @@ const { freeBytes, hasRoom, humanBytes, MIN_FREE_BYTES } = await import('../lib/
 const { staleMcp } = await import('../lib/stale-mcp.js');
 const { receiveConnectRequests, listPending, readPending, dropPending, sendConnectRequest,
   readBlocked, blockDevice, unblockDevice } = await import('../lib/connect.js');
-const { matchInvite, markInviteUsed, inviteConflict } = await import('../lib/invite.js');
+const { matchInvite, markInviteUsed, inviteConflict, newLinkInvite } = await import('../lib/invite.js');
 // データ層（サイドカー保存＋画面用JSONビュー）。BUMP_HOME 設定後に読み込む。
 const { identity, stateJson, pairJson, inboxJson, letterJson, sentJson,
   markTriage, addInquiry, sanitizeChannels, carryLocalPeer, contactLabel, OPEN_SCHEMES,
@@ -127,7 +127,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/qr') {
       const prof = await readProfile();
       // QRは軽さ優先＝画像は載せない（名前・絵文字のみ）。画像は招待リンク経由で伝わる。
-      const b = signedBundle(await identity(), now(), 300, { name: prof.name || '', icon: prof.icon || '' });
+      const b = signedBundle(await identity(), now(), 300, { name: prof.name || '', icon: prof.icon || '', invite_link: await newLinkInvite() });
       const dataUri = await QRCode.toDataURL(JSON.stringify(b), { margin: 1, width: 340,
         color: { dark: '#16202b', light: '#ffffff' } });
       return json(res, 200, { dataUri, expires_at: b.expires_at, device: b.device_id.slice(0, 8) });
@@ -135,7 +135,8 @@ const server = createServer(async (req, res) => {
     // 招待リンク用トークン（署名付き・短命bundleをbase64url化）。離れた相手向けの主役。
     if (url.pathname === '/api/invite') {
       const prof = await readProfile();
-      const b = signedBundle(await identity(), now(), 300, { name: prof.name || '', icon: prof.icon || '', avatar: prof.avatar || '', banner: prof.banner || '', links: prof.links || '', channels: sanitizeChannels(prof.channels) });
+      // invite_link＝使い切りの合言葉。開いた側がこれを添えて申し込み返すので、こちらにも縁ができる。
+      const b = signedBundle(await identity(), now(), 300, { name: prof.name || '', icon: prof.icon || '', avatar: prof.avatar || '', banner: prof.banner || '', links: prof.links || '', channels: sanitizeChannels(prof.channels), invite_link: await newLinkInvite() });
       const token = Buffer.from(JSON.stringify(b), 'utf8').toString('base64url');
       return json(res, 200, { token, expires_at: b.expires_at, device: b.device_id.slice(0, 8) });
     }
@@ -220,6 +221,7 @@ const server = createServer(async (req, res) => {
       await logEvent(id, { type: 'engaged', peer: peer.device_id, via: 'connect-request',
         invite: iv ? iv.label : null, confirmed_by: peer.confirmed_by, ...(replaced ? { replaced } : {}) }, now());
       await dropPending(rec.device_id);
+      await replayStrays(id, rec.device_id);   // 承認の前に届いていた手紙
       pushProfile(id);          // つながった相手へ自分のプロフィールを届ける
       return json(res, 200, { engaged: id });
     }
@@ -315,8 +317,18 @@ const server = createServer(async (req, res) => {
       carryConfirmation(peer, ex);
       await writePeer(id, peer);
       await logEvent(id, { type: peer.verified ? 'paired-verified' : 'engaged', peer: peer.device_id }, now());
+      // 招待リンク・QRを開いた側から、招待した側へ接続を申し込む（合言葉つき＝相手は承認なしで縁を結ぶ）。
+      // 先に申し込んでからプロフィールを送る（相手の側で縁ができる前の手紙は預かられ、縁ができたら届く）。
+      let requested = false;
+      if (typeof bundle.invite_link === 'string' && bundle.invite_link) {
+        try { const prof = await readProfile();
+          await sendConnectRequest({ identity: await identity(), toDeviceId: bundle.device_id, name: prof.name || '',
+            token: bundle.invite_link, relayDir: RELAY, now }); requested = true; }
+        catch (e) { warn(t('receiving connect requests'), e); }
+      }
+      await replayStrays(id, bundle.device_id);
       pushProfile(id); // つながった相手へ自分のプロフィールを届ける（鍵だけengageでも絵が出る）
-      return json(res, 200, { id, verified: peer.verified, confirmed: peer.confirmed_by });
+      return json(res, 200, { id, verified: peer.verified, confirmed: peer.confirmed_by, requested });
     }
     // この相手の"こちら側だけの呼び名"を設定/解除（空で相手の署名済み名に戻る）。
     if (url.pathname === '/api/rename' && req.method === 'POST') {

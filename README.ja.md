@@ -48,10 +48,15 @@ E2E暗号は Node標準cryptoのみ。スイート `mm1-x25519-hkdf-sha256-aes25
 ## 動かす
 
 ```sh
+git clone https://github.com/daiokawa/bump.git && cd bump
+npm ci --omit=dev   # npm install ではなく ci（署名の対象の package-lock.json を書き換えないため）
+node bin/bump.js relays add https://<中継の住所>   # 招待してくれる人から住所をもらう
 bash up.sh          # relay(8791) + 画面(8790) + 新着通知の常駐
 bash open-app.sh    # 画面をchromelessな窓で開く
 bash up.sh stop     # 停止
 ```
+
+**つなぎ方：** どちらか一方が画面の「ユーザー追加」で招待リンク（5分有効）を作って送り、もう一方が自分のMacのブラウザで開くだけ。リンクに使い切りの合言葉が入っているので、作った側にも1分ほどで自動で縁ができる。2人が少なくとも1つ同じ中継を使っている必要がある（上の `relays add` の行がそれ）。
 
 必要なもの：macOS、Node.js 20+、手元のAI（Claude Code / codex cli）。Tailscaleは**relayを外部公開する側だけ**必要。
 

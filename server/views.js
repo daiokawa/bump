@@ -9,6 +9,7 @@ import { listPairs, readPeer, readJson, writeJson } from '../lib/store.js';
 import { pairSafetyNumber, confirmedBy } from '../lib/pairing.js';
 import { receiveInbox, sendReceipt, receiptsEnabled, readSentStatus, CONTROL_TYPES } from '../lib/exchange.js';
 const isControl = (m) => CONTROL_TYPES.includes(m.type); // 受領・プロフィール等＝人間の一覧に出さない
+import { handleConnectRequests } from '../lib/connect.js';
 import { pushToRelay, pullAllFromRelay } from '../lib/relay.js';
 import { beat, reachOf } from '../lib/presence.js';
 import { replyOf } from '../lib/reply.js';
@@ -121,7 +122,10 @@ async function pullAll() {
       try { const p = await readPeer(id); peersOf[p.device_id] = id; peers[id] = p; } catch {}
     }
     try {
-      const placed = await pullAllFromRelay({ relayDir: RELAY, myDeviceId: me.device_id, peersOf });
+      // 同じ受信箱に来た接続リクエストも拾う（招待リンクから来たものはここで縁になる）。
+      const reqs = [];
+      const placed = await pullAllFromRelay({ relayDir: RELAY, myDeviceId: me.device_id, peersOf, onConnect: (b) => { reqs.push(b); } });
+      if (reqs.length) await handleConnectRequests(reqs, { myDeviceId: me.device_id, relayDir: RELAY, now }).catch((e) => warn(t('receive'), e));
       // 封筒が置かれた縁だけ復号・検証する（届かないのに画面が正常に見える、を防ぐ）
       for (const id of Object.keys(placed || {})) {
         try { await receiveInbox({ identity: me, peer: peers[id], pairId: id, now }); }
