@@ -249,6 +249,12 @@ async function renderMain(){
     M.append(mHead(av,(p.name||t('No name')),tf('Connection request received {at}',{at:ts(p.at)}),stat,p.invite?(p.invite.conflict?'no':'ok'):''));
     const body=el('div','m-body');
     const kc=keyChangedCard(p);if(kc)body.append(kc);
+    // 自分の招待リンクから来た申し込み。リンクは盗み見られうるので自動では結ばず、ここで人が確かめて承認する。
+    if(p.via_link){const lk=el('div','card2');const lh=el('h4');lh.textContent=t('From your invite link');lk.append(lh);const ld=el('div');ld.style.cssText='font-size:12.5px;line-height:1.85;color:'+(p.via_link.conflict?'var(--red);font-weight:700':'#38495a');
+      ld.textContent=p.via_link.conflict?t('⚠ More than one device used the same invite link. The link may have been forwarded or seen by someone else — check with the person directly before approving.')
+        :(p.via_link.fresh?tf('This request used the invite link you made at {at}, within its 5 minutes. A link can be seen by others, though — if the name looks wrong or you did not just send one, ask the person before approving.',{at:ts(p.via_link.link_at)})
+        :tf('This request carries the code from the invite link you made at {at}, but arrived after its 5 minutes. Approve only if you expected it.',{at:ts(p.via_link.link_at)}));
+      lk.append(ld);body.append(lk);}
     // 1) 本人確認：合言葉の照合結果。ここが緑なら人の確認作業は要らない。
     const c1=el('div','card2');const h1=el('h4');h1.textContent=t('Identity check');c1.append(h1);
     const t1=el('div');t1.style.cssText='font-size:13.5px;line-height:1.8';

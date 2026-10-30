@@ -135,8 +135,9 @@ const server = createServer(async (req, res) => {
     // 招待リンク用トークン（署名付き・短命bundleをbase64url化）。離れた相手向けの主役。
     if (url.pathname === '/api/invite') {
       const prof = await readProfile();
-      // invite_link＝使い切りの合言葉。開いた側がこれを添えて申し込み返すので、こちらにも縁ができる。
-      const b = signedBundle(await identity(), now(), 300, { name: prof.name || '', icon: prof.icon || '', avatar: prof.avatar || '', banner: prof.banner || '', links: prof.links || '', channels: sanitizeChannels(prof.channels), invite_link: await newLinkInvite() });
+      // invite_link＝使い切りの合言葉。開いた側がこれを添えて申し込み返し、こちらの承認待ちに「あなたのリンクから」と並ぶ。
+      // リンクと連絡経路は載せない（リンクは盗み見られうる。確認が済んでからプロフィールの手紙で届く）。
+      const b = signedBundle(await identity(), now(), 300, { name: prof.name || '', icon: prof.icon || '', avatar: prof.avatar || '', banner: prof.banner || '', invite_link: await newLinkInvite() });
       const token = Buffer.from(JSON.stringify(b), 'utf8').toString('base64url');
       return json(res, 200, { token, expires_at: b.expires_at, device: b.device_id.slice(0, 8) });
     }
@@ -441,6 +442,7 @@ const server = createServer(async (req, res) => {
       const { writePeer, logEvent } = await import('../lib/store.js');
       const peer = markConfirmed(await readPeer(b.id), 'number', now());
       await writePeer(b.id, peer); await logEvent(b.id, { type: 'verified', peer: peer.device_id }, now());
+      pushProfile(b.id);   // 確認が済んだので、確認前は送らなかったリンク・連絡経路も届ける
       return json(res, 200, { verified: b.id });
     }
     res.writeHead(404); res.end('not found');

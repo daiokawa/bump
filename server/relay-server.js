@@ -176,7 +176,10 @@ const server = createServer(async (req, res) => {
         if (items.length && bytes + b > GET_MAX_BYTES) break;          // 1通目だけは大きくても渡す（1MBの配布物）
         if (inflight + b > INFLIGHT_MAX) { if (!items.length) return json(res, 503, { error: 'busy' }); break; }
         bytes += b; hold.n += b; inflight += b; last = x;
-        try { items.push({ seq: x.seq, envelope: JSON.parse(text) }); } catch {}
+        // at＝この中継が預かった時刻。招待リンクの「5分」を、申し込む側が自由に書ける時刻ではなく
+        // 中継の時刻で判定するために渡す（受け取る側は、無ければ使わない）。
+        let at; try { at = new Date((await stat(join(ridDir(rid), x.f))).mtimeMs).toISOString(); } catch {}
+        try { items.push({ seq: x.seq, envelope: JSON.parse(text), ...(at ? { at } : {}) }); } catch {}
       }
       const cursor = last ? last.seq : after;                          // 返した所まで。続きは次の取り込みで
       // 手渡した事実を記録（応答が途中で落ちても受信側cursorは進まず再取得できる＝

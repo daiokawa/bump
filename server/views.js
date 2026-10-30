@@ -122,10 +122,10 @@ async function pullAll() {
       try { const p = await readPeer(id); peersOf[p.device_id] = id; peers[id] = p; } catch {}
     }
     try {
-      // 同じ受信箱に来た接続リクエストも拾う（招待リンクから来たものはここで縁になる）。
+      // 同じ受信箱に来た接続リクエストも拾う（承認待ちに並ぶ）。
       const reqs = [];
       const placed = await pullAllFromRelay({ relayDir: RELAY, myDeviceId: me.device_id, peersOf, onConnect: (b) => { reqs.push(b); } });
-      if (reqs.length) await handleConnectRequests(reqs, { myDeviceId: me.device_id, relayDir: RELAY, now }).catch((e) => warn(t('receive'), e));
+      if (reqs.length) await handleConnectRequests(reqs, { myDeviceId: me.device_id, now }).catch((e) => warn(t('receive'), e));
       // 封筒が置かれた縁だけ復号・検証する（届かないのに画面が正常に見える、を防ぐ）
       for (const id of Object.keys(placed || {})) {
         try { await receiveInbox({ identity: me, peer: peers[id], pairId: id, now }); }

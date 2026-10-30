@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Opening an invite link no longer connects automatically; it brings a request marked "from your invite link".** Since 10-30 the person who made a link was connected to whoever used it first, with no step in between. A link sent by chat or mail can be seen by someone else, and the first to use it got the bond while the intended person was left waiting — the "forwarded link" check only caught whoever came second. Found by codex reading the code; reproduced before fixing. Now the request waits for one click, with a note saying it came from your link (or a warning if more than one device used the same link), and the watcher tells you someone opened it. Letters they send before you approve are still held and delivered on approval.
+- **An invite link's 5 minutes now also bound the request it brings.** The code inside a link was accepted for 7 days on the inviting side, so anyone holding an old link could still send a new request through it. The 7 days were meant only for a request already on its way while your Mac was off. "From your invite link" is now shown only for requests the relay received within the link's 5 minutes (plus 2 for clock drift), judged by the relay's clock, not by a time the requester writes.
+- **Your links and contact routes are no longer sent before a contact is confirmed.** A contact connected without an invite code, an in-person QR or a number check received your full profile, including links and contact channels — and invite links carried them too. Until a contact is confirmed they now get your name, icon and pictures only; confirming (number check, in-person QR, or an approval with a matching package code) sends the rest. Profiles you have already received are not erased by the shorter one.
+
 ## 2026-10-30 (later)
 
 - **Invite links from someone with a Japanese (or any non-ASCII) display name now work.** Opening such a link always failed with "Could not verify the invite link": the page decoded the link with `atob`, which yields one character per byte, so a UTF-8 name came out garbled and the signature no longer matched. Diagnosed down to the cause by S. at DW, who connected by switching to a Latin-script name in the meantime. The link page and "paste a link" now decode it as UTF-8. The fix is on the side that opens the link.

@@ -367,10 +367,17 @@ async function cmdDaemon(flags) {
     for (const pairId of pairIds) {
       try { const p = await readPeer(pairId); peers[pairId] = p; peersOf[p.device_id] = pairId; } catch {}
     }
-    // 同じ受信箱に来た接続リクエストも拾う（招待リンクから来たものは承認なしで縁になる＝画面を開いていなくても）。
+    // 同じ受信箱に来た接続リクエストも拾う（画面を開いていなくても承認待ちに並ぶ）。
+    // 自分の招待リンクから来たものは「開いた人がいる」と知らせる（承認は画面で人が）。
     const reqs = [];
     if (relayDir) await pullAllFromRelay({ relayDir, myDeviceId: id.device_id, peersOf, onConnect: (b) => { reqs.push(b); } }).catch(() => {});
-    if (reqs.length) await handleConnectRequests(reqs, { myDeviceId: id.device_id, relayDir, now }).catch(() => {});
+    if (reqs.length) {
+      const got = await handleConnectRequests(reqs, { myDeviceId: id.device_id, now }).catch(() => []);
+      for (const r of got) if (r.via_link) {
+        const msg = tf('[bump] {name} opened your invite link — approve them on screen to connect', { name: r.name || r.device_id.slice(0, 6) });
+        if (flags.notify === 'osa') await osaNotify(msg).catch(() => {}); else out(msg);
+      }
+    }
     for (const pairId of pairIds) {
       const peer = peers[pairId]; if (!peer) continue;
       const p = pairPaths(pairId);
