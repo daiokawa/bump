@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2026-10-30
 
 - **An invite link now connects both people.** Opening someone's invite link (or scanning their QR) added them to your contacts — but nothing told them, so they never had you, and every letter you sent them was silently dropped on their side while yours said "sent". Found by walking the GitHub install path from scratch with two fresh machines. The link now carries a one-time code; opening it also sends a connection request with that code, and the person who made the link is connected automatically (they issued the link, so that is their consent), within a minute, even with the console closed. A code claimed by two different devices is not auto-approved (it shows as a normal request). Letters that arrive from someone before the bond exists are now held for up to 7 days (capped) and delivered once it does, instead of being dropped. Both people need this version.
 - **The GitHub install path now says how to reach other people.** The README steps started a private relay on your own Mac and never asked for a shared one, so a repo install could not reach anyone. Added one step: `node bin/bump.js relays add <address>`, with the address from whoever invites you.
