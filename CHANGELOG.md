@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-30 (b)
+
+- **Invite links from someone with a Japanese (or any non-ASCII) display name now work.** Opening such a link always failed with "Could not verify the invite link": the page decoded the link with `atob`, which yields one character per byte, so a UTF-8 name came out garbled and the signature no longer matched. Diagnosed down to the cause by S. at DW, who connected by switching to a Latin-script name in the meantime. The link page and "paste a link" now decode it as UTF-8. The fix is on the side that opens the link.
+- The relay setup guide now says to check that Funnel's port 443 is free first (and use `--https=8443` if it is taken), and that `colima start` switches docker's default context (both from K.K. at DW). Packages are signed with the current Developer ID by default.
+
 ## 2026-10-30
 
 - **An invite link now connects both people.** Opening someone's invite link (or scanning their QR) added them to your contacts — but nothing told them, so they never had you, and every letter you sent them was silently dropped on their side while yours said "sent". Found by walking the GitHub install path from scratch with two fresh machines. The link now carries a one-time code; opening it also sends a connection request with that code, and the person who made the link is connected automatically (they issued the link, so that is their consent), within a minute, even with the console closed. A code claimed by two different devices is not auto-approved (it shows as a normal request). Letters that arrive from someone before the bond exists are now held for up to 7 days (capped) and delivered once it does, instead of being dropped. Both people need this version.

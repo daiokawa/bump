@@ -51,7 +51,9 @@ function fail(msg){
   const m=location.hash.match(/i=([A-Za-z0-9\-_]+)/);
   if(!m)return fail(t('Invalid invite link.'));
   let bundle;
-  try{ bundle=JSON.parse(atob(m[1].replace(/-/g,'+').replace(/_/g,'/'))); }catch(e){ return fail(t('Could not read the invite link.')); }
+  // atob は1バイト＝1文字で返すので、そのまま JSON にすると日本語の名前が化けて署名が合わない
+  // （DW 志方さんの切り分け 2026-10-30）。UTF-8 として読み直す。
+  try{ const bin=atob(m[1].replace(/-/g,'+').replace(/_/g,'/')); bundle=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0)))); }catch(e){ return fail(t('Could not read the invite link.')); }
   // fragmentは履歴・スクショに残り得るので即消す（codexレビュー）
   try{ history.replaceState(null,'',location.pathname); }catch(e){}
   const r=await (await fetch('/api/scan',{method:'POST',headers:{'content-type':'application/json'},
