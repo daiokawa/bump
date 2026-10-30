@@ -17,7 +17,16 @@ colima start -p bump --cpu 1 --memory 1 --disk 10 --vm-type vz --mount-type virt
 bash installer/relay-docker/run.sh      # 127.0.0.1:8791 で起動。ログイン時の自動起動も登録
 ```
 
-外へは HTTPS で出します。Tailscale なら `tailscale funnel --bg http://127.0.0.1:8791`。
+- `colima start` は docker の既定の接続先（context）を colima-bump に切り替えます。Docker Desktop などを併用しているなら、
+  `docker context use desktop-linux`（Docker Desktop の場合。一覧は `docker context ls`）で元に戻してください。
+  run.sh は接続先を自分で指定するので、戻しても中継には影響しません（DW 加賀爪さんの指摘 2026-10-30）。
+
+外へは HTTPS で出します（Tailscale Funnel の場合）。**先に `tailscale funnel status` で 443 番が空いているか確かめてください。**
+
+- 空いていれば: `tailscale funnel --bg http://127.0.0.1:8791` → 住所は `https://<マシン名>.<tailnet>.ts.net`
+- 443 番に別のサービスが載っていれば、上の行を打つとその設定を上書きして外に出してしまうおそれがあります。
+  空いている別の番号（Funnel は 443・8443・10000 番が使えます）で出してください:
+  `tailscale funnel --bg --https=8443 http://127.0.0.1:8791` → 住所は `https://<マシン名>.<tailnet>.ts.net:8443`（DW 加賀爪さんの指摘 2026-10-30）
 
 ## B. Linux の VPS で動かす
 

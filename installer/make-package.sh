@@ -59,7 +59,9 @@ printf 'アプリ版 %s (%s) 宛先:%s\n' "$(date '+%Y-%m-%d')" "$(git rev-parse
 # 署名。Developer ID があれば本署名（相手のMacで「開発元が確認できません」が出ない）。
 # 無い環境ではad-hocに落とす＝ビルド自体は通す（開発中に止めない）。
 # --options runtime は公証(notarize)の必須条件。--deep は非推奨だが同梱物が素のファイルのみなので実害なし。
-SIGN_ID="${MM_SIGN_ID:-$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Developer ID Application/{print $2; exit}')}"
+# 既定は Bravo, Inc.（2026-10-30 一本化）。個人の X58CH5PQ9F は失効済みだがキーチェーンに残り、先に見つかるので避ける。
+SIGN_ID="${MM_SIGN_ID:-$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Developer ID Application: Bravo, Inc\./{print $2; exit}')}"
+[ -n "$SIGN_ID" ] || SIGN_ID="$(security find-identity -v -p codesigning 2>/dev/null | awk -F'"' '/Developer ID Application/ && !/X58CH5PQ9F/{print $2; exit}')"
 if [ -n "$SIGN_ID" ]; then
   codesign --force --deep --timestamp --options runtime --sign "$SIGN_ID" "$APP" \
     && echo "署名: $SIGN_ID" || echo "（署名に失敗。ad-hocに落とします）"
