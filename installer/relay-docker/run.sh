@@ -3,6 +3,8 @@
 # コンテナから見えるのは ~/.bump/relaybox だけ。ポートはホストの 127.0.0.1:8791 にだけ出す。
 # 前提: colima start -p bump --cpu 1 --memory 1 --disk 10 --vm-type vz --mount-type virtiofs --mount ~/.bump/relaybox:w
 # 使い方: bash installer/relay-docker/run.sh     （launchd の chat.bump.relay は先に止めておく）
+# 受信箱の読み取りを署名つきだけにする: MM_REQUIRE_SIGNED_GET=1 bash installer/relay-docker/run.sh
+#   （全員が r2026-10-25 以降の版になってから。設定はコンテナに残り、再起動しても続く）
 # 戻す:   docker rm -f bump-relay && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/chat.bump.relay.plist
 set -euo pipefail
 export DOCKER_CONTEXT="${DOCKER_CONTEXT:-colima-bump}"   # 専用プロファイル（VMに見せるのも relaybox だけ）
@@ -14,6 +16,7 @@ docker run -d --name bump-relay --restart unless-stopped \
   --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
   --memory 128m --pids-limit 64 \
   -p 127.0.0.1:8791:8791 -v "$BOX":/box \
+  ${MM_REQUIRE_SIGNED_GET:+-e MM_REQUIRE_SIGNED_GET=1} \
   bump-relay >/dev/null
 # ログイン時に専用VMを起こす（コンテナは --restart で後から自動で上がる）
 LA="$HOME/Library/LaunchAgents/chat.bump.colima.plist"
@@ -29,4 +32,4 @@ cat > "$LA" <<PL
   <key>StandardErrorPath</key><string>/tmp/mm-chat.bump.colima.log</string>
 </dict></plist>
 PL
-echo "bump-relay を起動しました（127.0.0.1:8791 → コンテナ, box=${BOX}）"
+echo "bump-relay を起動しました（127.0.0.1:8791 → コンテナ, box=${BOX}${MM_REQUIRE_SIGNED_GET:+, 署名つきの読み取りだけ}）"
