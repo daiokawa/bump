@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-28
+
+- **New versions are released under FSL-1.1-MIT instead of MIT.** Using bump stays free for any purpose, including running it inside a company and installing and operating it for clients as a service provider. The one thing not permitted is offering bump itself, or something substantially the same, as a competing commercial product; doing that needs an agreement with the licensor. Each version becomes MIT two years after its release. Versions up to and including r2026-11-27 (`0bcda7f`) were released under MIT and remain so. Why: bump is meant to be installed widely, including by service providers for their clients, and this keeps that open while making sure the project itself is not resold as someone else's product.
+
 ## 2026-11-27
 
 - **A contact can no longer make bump write files outside `~/.bump`.** A letter's id becomes a file name, and it was not checked after decryption, so a connected contact could sign a letter whose id contained `../` and have it saved as a `.msg.json` file in another folder you can write to. The name in a connect request could do the same when approved with its default name. Letter ids are now limited to letters, digits, `-` and `_` (real ids are random UUIDs), and contact names may not contain path separators or `..`; a request with such a name is approved under a default name instead.

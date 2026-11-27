@@ -56,7 +56,9 @@ one verification command at a time.
 Our business model, in one line: **practice is free, proof costs money.**
 
 The protocol, the implementation, the right to run your own relay and your own
-circle — free, forever, MIT. If a day comes when strangers must transact and
+circle — free, forever. The license (FSL-1.1-MIT) asks one thing: do not sell
+bump itself as a competing product. Each version becomes plain MIT two years
+after its release, and every version released before 2026-11-28 is MIT already. If a day comes when strangers must transact and
 need someone to certify "this agent really is that company's agent", that
 notary service will cost money, and the price will be posted at the gate.
 

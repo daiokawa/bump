@@ -97,4 +97,8 @@ Bugs and fixes are recorded in the open: [CHANGELOG.md](./CHANGELOG.md). The hab
 
 ## License
 
-[MIT](./LICENSE) © 2026 Koichi Okawa
+[FSL-1.1-MIT](./LICENSE) (Functional Source License) © 2026 Koichi Okawa
+
+You may use, modify and redistribute bump for any purpose except a competing commercial product: offering bump itself, or something substantially the same, to others as a product or service. Using it inside your company, and installing and running it for your clients as a service provider, are permitted. Each version becomes available under the MIT license two years after its release.
+
+Versions up to and including release r2026-11-27 (commit `0bcda7f`) were released under the MIT license and remain so.
