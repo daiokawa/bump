@@ -23,10 +23,10 @@ const RELAY = process.env.MM_RELAY || '/tmp/mm-demo/relay';
 process.env.BUMP_HOME = SELF; // 以降 paths.js は自分のエンドを指す
 
 import QRCode from 'qrcode';
-const { readPeer, readJson, ensurePair, writePeer, logEvent, listPairs } = await import('../lib/store.js');
-const { pairPaths } = await import('../lib/paths.js');
+const { readPeer, readJson, ensurePair, writePeer, logEvent, listPairs, writeSecretJson, protectSecrets } = await import('../lib/store.js');
+const { pairPaths, safePairId } = await import('../lib/paths.js');
 const { engagePeer, markConfirmed, carryConfirmation } = await import('../lib/pairing.js');
-const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage, unsendMessage } = await import('../lib/exchange.js');
+const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage, unsendMessage, safeImage, AVATAR_MAX, BANNER_MAX } = await import('../lib/exchange.js');
 const { buildPackage, listPackages, discardPackage, MAX_PAYLOAD_BYTES } = await import('../lib/package.js');
 const { pushToRelay, replayStrays } = await import('../lib/relay.js');
 const { signedBundle, verifyBundle } = await import('../lib/crypto.js');
@@ -83,20 +83,36 @@ function framedLetter(pairId, L) {
 //  - Sec-Fetch-Site: ブラウザが自分で付ける（偽装できない）。cross-site/same-siteは拒否。
 //  - Origin: ブラウザなら必ず付く。localhost以外は拒否。
 //  - どちらも無い＝ブラウザ以外（CLI・voice-codeのサーバ側プロキシ）。従来どおり通す。
+//  - Origin はポートまで見る。同じMacの別ポート（開発中のサイト等）から来たものは通さない。
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+const isSelf = (hostname, port) => LOOPBACK.has(hostname) && Number(port || 80) === PORT;
 function sameOriginOnly(req) {
   const sfs = req.headers['sec-fetch-site'];
   if (sfs && sfs !== 'same-origin' && sfs !== 'none') return false;
   const o = req.headers.origin;
   if (!o) return true;
-  try { const u = new URL(o); return u.hostname === 'localhost' || u.hostname === '127.0.0.1'; }
+  try { const u = new URL(o); return u.protocol === 'http:' && isSelf(u.hostname, u.port); }
   catch { return false; }
+}
+// 宛先名（Host）の確認＝DNS rebinding 対策。悪いサイトが自分のドメインを 127.0.0.1 に向け直すと、
+// ブラウザはそれを「同じサイト」とみなし、GET（手紙・通知トークン・招待リンク）を読めてしまう。
+// 届いた Host が自分（localhost / 127.0.0.1 と自分のポート）でなければ何も返さない。
+// voice-code・bump for mobile は 127.0.0.1:ポート に直接つなぐので影響しない。
+function hostIsSelf(req) {
+  const h = String(req.headers.host || '');
+  const m = h.match(/^(\[[^\]]*\]|[^:]*)(?::(\d+))?$/);
+  return !!m && isSelf(m[1].toLowerCase(), m[2]);
 }
 
 async function body(req) { let s = ''; for await (const c of req) s += c; try { return JSON.parse(s || '{}'); } catch { return {}; } }
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)); };
 
 const server = createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:${PORT}`);
+  if (!hostIsSelf(req)) {
+    console.log(`[blocked] unexpected Host ${String(req.headers.host || '').slice(0, 80)} ${req.method}`);
+    return json(res, 421, { error: 'unexpected host' });
+  }
+  let url; try { url = new URL(req.url, `http://localhost:${PORT}`); } catch { return json(res, 400, { error: 'bad request' }); }
   // 画面を開いた時・タブに戻った時の ?fresh=1 は間隔を待たずに中継へ取りに行く
   if (url.searchParams.has('fresh')) { freshPull(); pendingAt = 0; }
   try {
@@ -148,8 +164,8 @@ const server = createServer(async (req, res) => {
       const prof = await readProfile();
       if ('name' in b) prof.name = (b.name || '').slice(0, 40);
       if ('icon' in b) prof.icon = (b.icon || '').slice(0, 8);
-      if ('avatar' in b) prof.avatar = (b.avatar || '').slice(0, 120000);
-      if ('banner' in b) prof.banner = (b.banner || '').slice(0, 200000);
+      if ('avatar' in b) prof.avatar = safeImage(b.avatar, AVATAR_MAX);
+      if ('banner' in b) prof.banner = safeImage(b.banner, BANNER_MAX);
       if ('links' in b) prof.links = (b.links || '').slice(0, 2000);
       if ('channels' in b) prof.channels = sanitizeChannels(b.channels);
       await writeFile(PROFILE, JSON.stringify(prof, null, 2));
@@ -196,7 +212,9 @@ const server = createServer(async (req, res) => {
       const b = await body(req);
       const rec = await readPending(b.device_id);
       if (!rec) return json(res, 404, { error: 'not found' });
-      const id = (b.id || rec.name || `pair-${rec.device_id.slice(0, 6)}`).slice(0, 40);
+      // 名乗りの名前は相手が付けた値。縁の名前に使えない形（区切り文字・..）なら既定の名前にする。
+      const named = safePairId((rec.name || '').slice(0, 40)) ? rec.name : '';
+      const id = (b.id || named || `pair-${rec.device_id.slice(0, 6)}`).slice(0, 40);
       let ex = null; try { ex = await readPeer(id); } catch {}
       // 合言葉の照合が通った（かつ別の鍵が同じ合言葉を名乗っていない）承認は「合言葉」で確認したと記録する。
       const iv = rec.invite ? await matchInvite(rec.invite_proof, rec.device_id) : null;
@@ -287,7 +305,7 @@ const server = createServer(async (req, res) => {
       if ('chatworkToken' in b) cfg.chatworkToken = String(b.chatworkToken || '').slice(0, 100);
       if ('chatworkRoom' in b) cfg.chatworkRoom = String(b.chatworkRoom || '').replace(/[^0-9]/g, '').slice(0, 20);
       if ('chatworkAccount' in b) cfg.chatworkAccount = String(b.chatworkAccount || '').replace(/[^0-9]/g, '').slice(0, 20);
-      await writeFile(join(SELF, 'notify.json'), JSON.stringify(cfg, null, 2));
+      await writeSecretJson(join(SELF, 'notify.json'), cfg);
       return json(res, 200, { chatworkToken: cfg.chatworkToken || '', chatworkRoom: cfg.chatworkRoom || '', chatworkAccount: cfg.chatworkAccount || '' });
     }
     // 招待リンクを開いた側が取り込む受け皿ページ。
@@ -312,7 +330,7 @@ const server = createServer(async (req, res) => {
       await ensurePair(id);
       const peer = engagePeer({ pairId: id, bundle });
       peer.engaged_at = now();
-      peer.name = bundle.name || ''; peer.icon = bundle.icon || ''; peer.avatar = bundle.avatar || ''; peer.banner = bundle.banner || ''; peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels); // 相手の認証済みプロフィール
+      peer.name = bundle.name || ''; peer.icon = bundle.icon || ''; peer.avatar = safeImage(bundle.avatar, AVATAR_MAX); peer.banner = safeImage(bundle.banner, BANNER_MAX); peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels); // 相手の認証済みプロフィール
       markConfirmed(peer, b.via === 'camera' ? 'qr' : 'none', now()); // 直接スキャンのみ対面QR
       carryLocalPeer(peer, ex);                      // 手元設定(表示名・可視化等)は再接続でも保全
       carryConfirmation(peer, ex);
@@ -430,7 +448,7 @@ const server = createServer(async (req, res) => {
       if (!bundle?.device_id) return json(res, 400, { error: 'invalid bundle' });
       let ex = null; try { ex = await readPeer(b.id); } catch {}
       await ensurePair(b.id); const peer = engagePeer({ pairId: b.id, bundle }); peer.engaged_at = now();
-      peer.name = bundle.name || ''; peer.icon = bundle.icon || ''; peer.avatar = bundle.avatar || ''; peer.banner = bundle.banner || ''; peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels);
+      peer.name = bundle.name || ''; peer.icon = bundle.icon || ''; peer.avatar = safeImage(bundle.avatar, AVATAR_MAX); peer.banner = safeImage(bundle.banner, BANNER_MAX); peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels);
       carryLocalPeer(peer, ex);                      // 手元設定は再接続でも保全
       carryConfirmation(peer, ex);
       await writePeer(b.id, peer); await logEvent(b.id, { type: 'engaged', peer: peer.device_id }, now());
@@ -460,6 +478,7 @@ if (!(await hasRoom(SELF))) {
 // 同じポートを先に握っている画面があれば、落ちずに待って引き継ぐ。launchd の登録が2組ある・
 // ラッパー経由などで二重に起動されても、片方は待機に回る（Y.K.報告 2026-10-22）。
 // 落ちると KeepAlive が再起動を繰り返すだけになる。
+await protectSecrets(SELF);   // 以前の版が 0644 で書いた鍵・トークンを本人だけに
 let standby = false;
 const listen = () => server.listen(PORT, process.env.MM_BIND || '127.0.0.1', () => console.log(`bump console:  http://localhost:${PORT}  (self=${SELF})`));
 server.on('error', (e) => {

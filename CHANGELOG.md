@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-27
+
+- **A contact can no longer make bump write files outside `~/.bump`.** A letter's id becomes a file name, and it was not checked after decryption, so a connected contact could sign a letter whose id contained `../` and have it saved as a `.msg.json` file in another folder you can write to. The name in a connect request could do the same when approved with its default name. Letter ids are now limited to letters, digits, `-` and `_` (real ids are random UUIDs), and contact names may not contain path separators or `..`; a request with such a name is approved under a default name instead.
+- **A contact's picture can no longer tell them when you open bump.** Profile icons and banners were shown as given, so a contact could set a web address instead of an image, and your browser would fetch it each time you opened the console, revealing the time and your IP address. Only embedded images (`data:image/...`) are now accepted and shown; anything else is dropped, including values already saved.
+- **Connect requests and take-back requests are checked more strictly.** A request could claim someone else's device id while signing with its own key, an unreadable expiry date was treated as never expiring (the same for the time on a take-back request), and one request with a broken key stopped the remaining requests from being read. All three are fixed.
+- **Other web pages can no longer read the console.** The console checked where state-changing requests came from but not the host name a request was sent to, so a page using DNS rebinding could read letters and your Chatwork notification settings through the browser. The console now answers only requests addressed to `localhost` or `127.0.0.1` on its own port, and state-changing requests must come from that same port, not from another local site.
+- **Your keys and notification token are now readable only by you.** `identity.json`, `release-key.json` and `notify.json` were saved readable by other user accounts on the same Mac. They are now saved as `0600`, and existing files are fixed when the console or watcher starts.
+
+These were found in a code review and each was reproduced before fixing. No update is needed on the other person's side; installs pick this up on the next app open.
+
 ## 2026-10-31
 
 - **Opening an invite link no longer connects automatically; it brings a request marked "from your invite link".** Since 10-30 the person who made a link was connected to whoever used it first, with no step in between. A link sent by chat or mail can be seen by someone else, and the first to use it got the bond while the intended person was left waiting — the "forwarded link" check only caught whoever came second. Found by codex reading the code; reproduced before fixing. Now the request waits for one click, with a note saying it came from your link (or a warning if more than one device used the same link), and the watcher tells you someone opened it. Letters they send before you approve are still held and delivered on approval.

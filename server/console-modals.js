@@ -129,7 +129,7 @@ function openApprove(p,after){
 async function openProfile(pairId){
   let P={}; try{P=await (await fetch('/api/pair?id='+encodeURIComponent(pairId))).json();}catch{}
   const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.cssText='max-width:420px;width:min(420px,calc(100vw - 40px));padding:0;overflow:hidden';
-  if(P.banner){const bn=el('div','detail-banner');const im=el('img');im.src=P.banner;bn.append(im);panel.append(bn);}
+  if(imgOk(P.banner)){const bn=el('div','detail-banner');const im=el('img');im.src=P.banner;bn.append(im);panel.append(bn);}
   const body=el('div');body.style.cssText='padding:18px 20px 6px';
   const head=el('div');head.style.cssText='display:flex;align-items:center;gap:12px';
   const av=avaInto(el('div','m-ava'),{avatar:P.avatar,icon:P.icon,text:nm(pairId).slice(0,2).toUpperCase()});av.style.background=color(pairId);

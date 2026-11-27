@@ -32,7 +32,7 @@ import {
 } from '../lib/crypto.js';
 import {
   ensurePair, logEvent, readLog, verifyLog, readPeer, writePeer, hasPeer,
-  listPairs, listBox, writeJson, readJson, messageExists,
+  listPairs, listBox, writeJson, readJson, messageExists, writeSecretJson, protectSecrets,
 } from '../lib/store.js';
 import { engagePeer, pairSafetyNumber, pubkeysChanged, confirmedBy, markConfirmed } from '../lib/pairing.js';
 import { sendMessage, receiveInbox, CONTROL_TYPES, sendPackage } from '../lib/exchange.js';
@@ -71,7 +71,7 @@ async function cmdInit() {
   try { await readJson(identityPath()); die(t('Identity already exists (will not overwrite)')); } catch {}
   await mkdir(root(), { recursive: true });
   const id = generateIdentity(now());
-  await writeJson(identityPath(), id);
+  await writeSecretJson(identityPath(), id);
   out(tf('Identity created: device_id={id}', { id: id.device_id }));
   out(t('Share your public bundle with `bump id`'));
 }
@@ -133,7 +133,7 @@ async function cmdInitReleaseKey() {
   const { publicKey, privateKey } = generateKeyPairSync('ed25519');
   const pub = publicKey.export({ type: 'spki', format: 'der' }).toString('base64');
   const priv = privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64');
-  await writeJson(keyPath, { pub, priv, created_at: now() });
+  await writeSecretJson(keyPath, { pub, priv, created_at: now() });
   await writeFile(join(__dir, '..', 'release-pubkey.txt'), pub + '\n');
   out(`署名鍵を作成: ${keyPath}（バックアップし、リポジトリには入れない）`);
   out('公開鍵 release-pubkey.txt を commit して配布物に同梱してください。');
@@ -325,6 +325,7 @@ async function cmdDaemon(flags) {
   // 常駐する側も、逼迫していたら動かない（半端に書いて壊すより止める）。
   if (!(await hasRoom())) die(tf('Not enough free disk space ({free}). Free up space and start again', { free: humanBytes(await freeBytes()) }));
   const id = await loadIdentity();
+  await protectSecrets();   // 以前の版が 0644 で書いた鍵・トークンを本人だけに
   const relayDir = flags.relay || process.env.MM_RELAY;
   const tmux = flags.tmux;            // 自分のタブのtmuxセッション名（無ければ標準出力）
   // 既定60秒。人が読んで手元AIとやり取りする間合いの道具なので、5秒で見張る理由がない

@@ -349,7 +349,7 @@ async function renderMain(){
     const P=await (await fetch('/api/pair?id='+encodeURIComponent(sel.pair))).json();
     M.textContent='';
     const p=cache.pairs.find(x=>x.id===sel.pair)||{};
-    if(p.banner){const bn=el('div','detail-banner');const im=el('img');im.src=p.banner;bn.append(im);M.append(bn);}
+    if(imgOk(p.banner)){const bn=el('div','detail-banner');const im=el('img');im.src=p.banner;bn.append(im);M.append(bn);}
     const av=avaInto(el('div','m-ava'),{avatar:p.avatar,icon:p.icon,text:nm(sel.pair).slice(0,2).toUpperCase()});av.style.background=color(sel.pair);
     M.append(mHead(av,(p.label||nm(sel.pair)),(P.online?t('Reachable'):t('Away')),undefined,undefined,()=>openProfile(sel.pair)));
     const body=el('div','m-body');
