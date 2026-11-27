@@ -325,7 +325,7 @@ async function renderMain(){
     if(L.inquiries&&L.inquiries.length){const iq=el('div','inqlog');renderInqLines(iq,L.inquiries);body.append(iq);}
     // クイック返信：人間向けの手紙に、打たずに一言返す（そのまま手紙として相手へ飛ぶ）。
     // 押した状態はこの手紙に紐づけて保持する（1.6秒で戻すと、送ったかどうか履歴を見ないと
-    // 分からなくなる＝大川さん指摘 2026-08-15）。再送は可能なまま、✓と色だけ残す。
+    // 分からなくなる＝2026-08-15）。再送は可能なまま、✓と色だけ残す。
     const qr=el('div','quickrow');const ql=el('div','quicklabel');ql.textContent=t('Quick reply:');qr.append(ql);
     const qrKey='qr:'+sel.id; let qrSent=[]; try{qrSent=JSON.parse(localStorage.getItem(qrKey)||'[]')}catch{}
     ['Got it!','Thanks!','Likewise!','Fair point 🐷','Not following…','Love it!'].forEach(k=>{
@@ -393,7 +393,7 @@ async function renderMain(){
       body.append(cl);
     }
     M.append(body);
-    // 設定（表示名/安全性/オンライン開示）は常時展開せず、名前の右の ⚙ から（大川さん提案・voice-codeと同構成）。
+    // 設定（表示名/安全性/オンライン開示）は常時展開せず、名前の右の ⚙ から。
     const gear=el('button','pairset');gear.textContent=t('Settings');gear.title=t('Settings for this contact');gear.onclick=()=>openPairSettings(sel.pair,P);
     M.querySelector('.m-head').append(gear);
   }else{

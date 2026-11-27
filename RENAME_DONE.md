@@ -30,6 +30,6 @@
 - 凍結識別子（mm1/mm-connect/application/mm-）が無傷であることを確認
 
 ## 公開時に残る作業
-- GitHubリポ名 bump での新規作成とpush（大川さんの号令待ち）
+- GitHubリポ名 bump での新規作成とpush（作者の判断待ち）
 - npm公開するなら bumpd の名前確保
 - 商標・ドメインの確認（RENAME_CHECKLIST.md 参照）

@@ -317,7 +317,7 @@ async function cmdWatch(pairId, relayDir, flags) {
   }
 }
 
-// 常駐 watcher（大川さん決定の対称通知）。各手元端に1個。自分のrelayを見張り、
+// 常駐 watcher（対称通知）。各手元端に1個。自分のrelayを見張り、
 // 自分宛の新着が来たら復号し、自分のタブのClaudeに「新着あり・readして」と一言だけ
 // send-keys（本文は挿入しない＝invariant）。中央なし・自分宛だけ・他人の箱は触らない。
 // 使い方: BUMP_HOME=~/.bump MM_RELAY=... bump daemon --tmux <自分のtmuxセッション>
@@ -328,7 +328,7 @@ async function cmdDaemon(flags) {
   const relayDir = flags.relay || process.env.MM_RELAY;
   const tmux = flags.tmux;            // 自分のタブのtmuxセッション名（無ければ標準出力）
   // 既定60秒。人が読んで手元AIとやり取りする間合いの道具なので、5秒で見張る理由がない
-  // （大川さん判断 2026-10-21。5秒×縁の数で中継が1日28万件叩かれていた）。
+  // （2026-10-21。5秒×縁の数で中継が1日28万件叩かれていた）。
   const everyMs = Number(flags.every) || 60000;
   const submit = flags['no-enter'] ? false : true;
   const seen = {};                   // pairId -> Set(既知の相手msg id。初見時は取り込み前の手元分で埋める)

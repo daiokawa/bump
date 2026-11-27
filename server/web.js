@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // bump コンソール（自分のエンドの管理画面）。
-// 大川さんの整理: 常用UIは会話スクロールではなく "設定画面寄り" ── Engaged管理・
+// 整理: 常用UIは会話スクロールではなく "設定画面寄り" ── Engaged管理・
 // セキュリティ・送信・プラグイン。会話ビューアは監査タブに格下げ。
 //
 // この画面は自分のエンド(BUMP_HOME)としてふるまう。読み取りと送信・管理のみで、
@@ -104,7 +104,7 @@ const server = createServer(async (req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD' && !sameOriginOnly(req)) {
       // 標準出力にだけ残す。「うまくいかなかったこと」の一覧には出さない ── あそこは
       // 「相手に届いていない可能性がある」ものを見せる場所で、防御の成功を混ぜると
-      // 人が「何か失敗した」と受け取る（大川さん 2026-08-16・実際にそう見えた）。
+      // 人が「何か失敗した」と受け取る（2026-08-16・実際にそう見えた）。
       console.log(`[blocked] cross-site ${req.method} ${url.pathname} from ${req.headers.origin || 'unknown'}`);
       return json(res, 403, { error: 'cross-site request blocked' });
     }
@@ -256,7 +256,7 @@ const server = createServer(async (req, res) => {
       const b = await body(req);
       return json(res, 200, { discarded: await discardPackage(b.id) });
     }
-    // 送る（大川さん側＝配布者）。file はこのMac上のパス。
+    // 送る（配布者側）。file はこのMac上のパス。
     if (url.pathname === '/api/packages/send' && req.method === 'POST') {
       const b = await body(req);
       if (!b.file) return json(res, 400, { error: t('file required') });
