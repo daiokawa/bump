@@ -44,6 +44,7 @@ import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
 import { takeDaemonLock, ownsDaemonLock } from '../lib/single.js';
 import { relayUrls, editRelays } from '../lib/relays.js';
 import { handleConnectRequests, listPending } from '../lib/connect.js';
+import { autoApprovePending, readAuto, writeAuto } from '../lib/approve.js';
 import { t, tf } from '../lib/i18n.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));   // 専用パッケージに焼き込まれた物を読む用
@@ -391,6 +392,17 @@ async function cmdDaemon(flags) {
     if (relayDir) await pullAllFromRelay({ relayDir, myDeviceId: id.device_id, peersOf, onConnect: (b) => { reqs.push(b); } }).catch(() => {});
     if (reqs.length) {
       await handleConnectRequests(reqs, { myDeviceId: id.device_id, now }).catch(() => []);
+      await autoApprovePending({ identity: id, relayDir, now }).catch(() => []);   // 合言葉が合えば自動でつなぐ
+    }
+    // 自動でつながった相手を一度だけ知らせる（画面のサーバーがつないだ分も、ここで拾う）。
+    {
+      const list = await readAuto();
+      let changed = false;
+      for (const a of list) if (!a.notified) {
+        a.notified = true; changed = true;
+        await tellPending(tf('[bump] {name} connected through your invite — if you do not know them, release the bond on screen', { name: a.name || a.pair }));
+      }
+      if (changed) await writeAuto(list);
     }
     // 申し込みは全部知らせる（以前は招待リンクから来た分だけで、ほかは画面を開くまで誰も気づかず
     // 5件たまったことがある 2026-11-28）。取り込むのは画面のサーバーのこともあるので、

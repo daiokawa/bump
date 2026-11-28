@@ -11,6 +11,7 @@ import { pairSafetyNumber, confirmedBy } from '../lib/pairing.js';
 import { receiveInbox, sendReceipt, receiptsEnabled, readSentStatus, CONTROL_TYPES } from '../lib/exchange.js';
 const isControl = (m) => CONTROL_TYPES.includes(m.type); // 受領・プロフィール等＝人間の一覧に出さない
 import { handleConnectRequests } from '../lib/connect.js';
+import { autoApprovePending } from '../lib/approve.js';
 import { pushToRelay, pullAllFromRelay } from '../lib/relay.js';
 import { beat, reachOf } from '../lib/presence.js';
 import { replyOf } from '../lib/reply.js';
@@ -82,16 +83,12 @@ export function sanitizeChannels(arr) {
 // 開いてよいURLスキーム（アプリ前面化用）。file:等は拒否。
 export const OPEN_SCHEMES = ['http', 'https', 'mailto', 'tel', 'sms', 'line', 'tg', 'slack', 'msteams', 'zoommtg', 'fb-messenger'];
 
-// ユーザーが手元で付けた設定＝相手のバンドルには無い、自分だけの値。
-// 再接続(re-engage)やソフト更新でpeerを再構築しても、これらは決して上書きしない（＝ユーザーデータの保全）。
-const LOCAL_PEER_FIELDS = ['alias', 'show_presence', 'receiptsEnabled', 'ai'];
-export function carryLocalPeer(peer, existing) {
-  if (existing) for (const k of LOCAL_PEER_FIELDS) if (k in existing) peer[k] = existing[k];
-  return peer;
-}
+// 相手の承認待ち（こちらが申し込んだが、相手からまだ何も届いていない）。合言葉は画面に出さない。
+const awaitingOf = (peer) => (peer.awaiting ? { since: peer.awaiting.since, sent: !!peer.awaiting.sent, resent_at: peer.awaiting.resent_at || null } : null);
+export { carryLocalPeer } from '../lib/pairing.js';   // 手元だけの設定の引き継ぎ（承認の処理と共用）
 // 表示名。alias(手元の呼び名)があれば最優先でそのまま。無ければ 名前/縁名 に、
 // 人間なら「さん」を付ける。AI/タブ(peer.ai=true 例:codex)には付けない。
-export function contactLabel(pairId, name, alias, ai) { if (alias) return alias; const base = name || pairId; return ai ? base : tf('{name}', { name: base }); }
+export function contactLabel(pairId, name, alias, ai) { const al = String(alias || '').trim(); if (al) return al; const base = String(name || '').trim() || pairId; return ai ? base : tf('{name}', { name: base }); }
 
 // --- メッセージの読み出し ---------------------------------------------------
 // 自分のエンドが持つ履歴（自分発＋受信済）。分散＝各エンドが自分の分だけ持つ。
@@ -126,7 +123,10 @@ async function pullAll() {
       // 同じ受信箱に来た接続リクエストも拾う（承認待ちに並ぶ）。
       const reqs = [];
       const placed = await pullAllFromRelay({ relayDir: RELAY, myDeviceId: me.device_id, peersOf, onConnect: (b) => { reqs.push(b); } });
-      if (reqs.length) await handleConnectRequests(reqs, { myDeviceId: me.device_id, now }).catch((e) => warn(t('receive'), e));
+      if (reqs.length) {
+        await handleConnectRequests(reqs, { myDeviceId: me.device_id, now }).catch((e) => warn(t('receive'), e));
+        await autoApprovePending({ identity: me, relayDir: RELAY, now }).catch((e) => warn(t('receive'), e));   // 合言葉が合えば自動でつなぐ
+      }
       // 封筒が置かれた縁だけ復号・検証する（届かないのに画面が正常に見える、を防ぐ）
       for (const id of Object.keys(placed || {})) {
         try { await receiveInbox({ identity: me, peer: peers[id], pairId: id, now }); }
@@ -160,6 +160,7 @@ export async function stateJson() {
     const flagged = msgs.some((m) => m.from === peer.device_id && sc[m.id] && sc[m.id].flag);
     pairs.push({ id, name: peer.name || '', alias: peer.alias || '', icon: peer.icon || '', avatar: peer.avatar || '', banner: peer.banner || '', label: contactLabel(id, peer.name, peer.alias, peer.ai),
       device: peer.device_id.slice(0, 8), verified: !!peer.verified, confirmed: confirmedBy(peer),
+      awaiting: awaitingOf(peer), auto: peer.auto_connected || null,
       unread, online: reach.online, lastActivity: last, visible, flagged });
   }
   return { me: { device_id: me.device_id }, pairs };
@@ -183,6 +184,7 @@ export async function pairJson(id, opt = {}) {
   const hasMore = list.length > 0 ? all.findIndex((m) => m.id === list[0].id) > 0 : false;
   return {
     id, verified: !!peer.verified, confirmed: confirmedBy(peer), device: peer.device_id.slice(0, 12),
+    awaiting: awaitingOf(peer), auto: peer.auto_connected || null,
     name: peer.name || '', alias: peer.alias || '', label: contactLabel(id, peer.name, peer.alias, peer.ai),
     avatar: peer.avatar || '', banner: peer.banner || '', links: peer.links || '', channels: sanitizeChannels(peer.channels),
     safety: sn.display, visible: !!peer.show_presence, online: reach.online, lastSeen: reach.lastSeen,

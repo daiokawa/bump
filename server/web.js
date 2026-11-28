@@ -26,7 +26,7 @@ import QRCode from 'qrcode';
 const { readPeer, readJson, ensurePair, writePeer, logEvent, listPairs, writeSecretJson, protectSecrets } = await import('../lib/store.js');
 const { pairPaths, safePairId } = await import('../lib/paths.js');
 const { engagePeer, markConfirmed, carryConfirmation } = await import('../lib/pairing.js');
-const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage, unsendMessage, safeImage, AVATAR_MAX, BANNER_MAX } = await import('../lib/exchange.js');
+const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage, unsendMessage, safeImage, AVATAR_MAX, BANNER_MAX, receiveInbox } = await import('../lib/exchange.js');
 const { buildPackage, listPackages, discardPackage, MAX_PAYLOAD_BYTES } = await import('../lib/package.js');
 const { pushToRelay, replayStrays } = await import('../lib/relay.js');
 const { signedBundle, verifyBundle } = await import('../lib/crypto.js');
@@ -36,9 +36,10 @@ const { warn, warner, recentWarnings } = await import('../lib/log.js');
 const { freeBytes, hasRoom, humanBytes, MIN_FREE_BYTES } = await import('../lib/disk.js');
 const { staleMcp } = await import('../lib/stale-mcp.js');
 const { appVersion } = await import('../lib/version.js');
+const { approveRequest, autoApprovePending, readAuto, writeAuto } = await import('../lib/approve.js');
 const { receiveConnectRequests, listPending, readPending, dropPending, sendConnectRequest,
   readBlocked, blockDevice, unblockDevice } = await import('../lib/connect.js');
-const { matchInvite, markInviteUsed, inviteConflict, newLinkInvite } = await import('../lib/invite.js');
+const { matchInvite, markInviteUsed, inviteConflict, newLinkInvite, linkClaims, recentLinks } = await import('../lib/invite.js');
 // データ層（サイドカー保存＋画面用JSONビュー）。BUMP_HOME 設定後に読み込む。
 const { identity, stateJson, pairJson, inboxJson, letterJson, sentJson,
   markTriage, addInquiry, sanitizeChannels, carryLocalPeer, contactLabel, OPEN_SCHEMES,
@@ -160,12 +161,21 @@ const server = createServer(async (req, res) => {
       const token = Buffer.from(JSON.stringify(b), 'utf8').toString('base64url');
       return json(res, 200, { token, expires_at: b.expires_at, device: b.device_id.slice(0, 8) });
     }
+    // 最近作った招待リンクの様子（招待した側の画面用）。使った鍵を、縁・承認待ちの名前に直して返す。
+    if (url.pathname === '/api/invites/recent') {
+      const byDev = {};
+      for (const id of await listPairs()) { try { const p = await readPeer(id); byDev[p.device_id] = { state: 'connected', name: contactLabel(id, p.name, p.alias, p.ai) }; } catch {} }
+      for (const r of await listPending()) if (!byDev[r.device_id]) byDev[r.device_id] = { state: 'pending', name: String(r.name || '').trim() || r.device_id.slice(0, 6) };
+      const out = (await recentLinks()).map((l) => ({ created_at: l.created_at, expired: Date.now() - Date.parse(l.created_at) > 10 * 60_000,
+        used: l.claims.map((d) => byDev[d] || { state: 'gone', name: d.slice(0, 6) }) }));
+      return json(res, 200, out);
+    }
     if (url.pathname === '/api/profile' && req.method === 'GET') return json(res, 200, await readProfile());
     if (url.pathname === '/api/profile' && req.method === 'POST') {
       const b = await body(req);
       // マージ更新＝送られたフィールドだけ差し替える。部分更新で他項目（画像・リンク等）を消さない。
       const prof = await readProfile();
-      if ('name' in b) prof.name = (b.name || '').slice(0, 40);
+      if ('name' in b) prof.name = String(b.name || '').trim().slice(0, 40);   // 前後の空白は落とす（名前の頭に空白が入って届いた 2026-11-28）
       if ('icon' in b) prof.icon = (b.icon || '').slice(0, 8);
       if ('avatar' in b) prof.avatar = safeImage(b.avatar, AVATAR_MAX);
       if ('banner' in b) prof.banner = safeImage(b.banner, BANNER_MAX);
@@ -177,6 +187,32 @@ const server = createServer(async (req, res) => {
     }
     // 縁を解く（削除）。既定は履歴を残して縁だけ解除＝相手はもう送れなくなる。
     // purge=true で手紙と監査ログごと消す（不可逆・UIで二重確認してから呼ぶ）。
+    // 合言葉が合って自動でつながった相手（まだ「見た」になっていないもの）。同じリンクを別の端末も
+    // 使っていたら conflict を付けて出す（どちらかは招待した本人ではない）。
+    if (url.pathname === '/api/auto' && req.method === 'GET') {
+      const list = (await readAuto()).filter((a) => !a.seen);
+      for (const a of list) a.conflict = a.link_at ? (await linkClaims(a.link_at)).some((d) => d !== a.device_id) : false;
+      return json(res, 200, list);
+    }
+    // 「見た」（心当たりがある）／「解く」（心当たりがない＝縁を解いてブロック。履歴は残す）。
+    if ((url.pathname === '/api/auto/ok' || url.pathname === '/api/auto/undo') && req.method === 'POST') {
+      const b = await body(req);
+      const list = await readAuto();
+      const a = list.find((x) => x.pair === b.pair && !x.seen);
+      if (!a) return json(res, 404, { error: 'not found' });
+      if (url.pathname === '/api/auto/undo') {
+        let peer = null; try { peer = await readPeer(a.pair); } catch {}
+        if (peer && peer.device_id === a.device_id) {
+          const base = pairPaths(a.pair).base;
+          for (const f of ['peer.json', 'cursor.json', 'seen.json', 'opened.json', 'triage.json', 'screen.json', 'inquiry.json', 'sent-status.json'])
+            await rm(join(base, f), { force: true });
+          await logEvent(a.pair, { type: 'released', peer: a.device_id, reason: 'auto-connect undone' }, now()).catch(() => {});
+        }
+        await blockDevice(a.device_id, a.name);
+      }
+      a.seen = true; await writeAuto(list);
+      return json(res, 200, { ok: true });
+    }
     if (url.pathname === '/api/unengage' && req.method === 'POST') {
       const b = await body(req);
       const id = String(b.id || '');
@@ -201,6 +237,7 @@ const server = createServer(async (req, res) => {
       if (Date.now() - pendingAt >= PULL_INTERVAL_MS) {
         pendingAt = Date.now();
         await receiveConnectRequests({ myDeviceId: me.device_id, relayDir: RELAY, now }).catch(warner(t('receiving connect requests')));
+        await autoApprovePending({ identity: me, relayDir: RELAY, now }).catch(warner(t('receiving connect requests')));
       }
       const list = await listPending();
       // 同じ名前の縁が別の鍵で既にある＝鍵が変わった（入れ直し等）か、同名の別人。承認の前に見せる。
@@ -213,39 +250,11 @@ const server = createServer(async (req, res) => {
     // 承認＝その場でengage（相手の公開鍵は申請に含まれ、署名検証済み）。縁の名前は人が付ける。
     if (url.pathname === '/api/pending/approve' && req.method === 'POST') {
       const b = await body(req);
-      const rec = await readPending(b.device_id);
-      if (!rec) return json(res, 404, { error: 'not found' });
-      // 名乗りの名前は相手が付けた値。縁の名前に使えない形（区切り文字・..）なら既定の名前にする。
-      const named = safePairId((rec.name || '').slice(0, 40)) ? rec.name : '';
-      const id = (b.id || named || `pair-${rec.device_id.slice(0, 6)}`).slice(0, 40);
-      let ex = null; try { ex = await readPeer(id); } catch {}
-      // 合言葉の照合が通った（かつ別の鍵が同じ合言葉を名乗っていない）承認は「合言葉」で確認したと記録する。
-      const iv = rec.invite ? await matchInvite(rec.invite_proof, rec.device_id) : null;
-      const inviteOk = !!iv && !inviteConflict(iv, rec.device_id);
-      let replaced = null;
-      if (ex && ex.device_id !== rec.device_id) {
-        // 同じ名前の縁に別の鍵。新しいパッケージの合言葉が通った時だけ、人の承認で鍵を置き換える。
-        // それ以外は拒否（黙って繋ぎ直さない）。古い peer.json は消さずに横へ退避する。
-        if (!inviteOk) return json(res, 409, { error: keyChangedMsg(contactLabel(id, ex.name, ex.alias, ex.ai))
-          + t(' (If this is someone else, approve under a different name.)') });
-        replaced = ex.device_id;
-        await writeFile(join(pairPaths(id).base, `peer.replaced-${now().replace(/[:.]/g, '')}.json`), JSON.stringify(ex, null, 2));
-      }
-      await ensurePair(id);
-      const peer = engagePeer({ pairId: id, bundle: rec });
-      peer.engaged_at = now(); peer.name = rec.name || '';
-      carryLocalPeer(peer, ex);
-      markConfirmed(peer, inviteOk ? 'invite' : 'none', now());
-      carryConfirmation(peer, ex);
-      await writePeer(id, peer);
-      // どのパッケージの合言葉で来たかも記録に残す（誰から誰へ渡ったかの系統）。
-      if (iv) await markInviteUsed(iv.token, rec.device_id, now());
-      await logEvent(id, { type: 'engaged', peer: peer.device_id, via: 'connect-request',
-        invite: iv ? iv.label : null, confirmed_by: peer.confirmed_by, ...(replaced ? { replaced } : {}) }, now());
-      await dropPending(rec.device_id);
-      await replayStrays(id, rec.device_id);   // 承認の前に届いていた手紙
-      pushProfile(id);          // つながった相手へ自分のプロフィールを届ける
-      return json(res, 200, { engaged: id });
+      const r = await approveRequest({ deviceId: String(b.device_id || ''), id: b.id, identity: await identity(), relayDir: RELAY, now });
+      if (r.error === 'not_found') return json(res, 404, { error: 'not found' });
+      if (r.error === 'key_changed') return json(res, 409, { error: keyChangedMsg(contactLabel(r.id, r.existing.name, r.existing.alias, r.existing.ai))
+        + t(' (If this is someone else, approve under a different name.)') });
+      return json(res, 200, { engaged: r.engaged });
     }
     if (url.pathname === '/api/pending/reject' && req.method === 'POST') {
       const b = await body(req);
@@ -333,7 +342,7 @@ const server = createServer(async (req, res) => {
       await ensurePair(id);
       const peer = engagePeer({ pairId: id, bundle });
       peer.engaged_at = now();
-      peer.name = bundle.name || ''; peer.icon = bundle.icon || ''; peer.avatar = safeImage(bundle.avatar, AVATAR_MAX); peer.banner = safeImage(bundle.banner, BANNER_MAX); peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels); // 相手の認証済みプロフィール
+      peer.name = String(bundle.name || '').trim().slice(0, 40); peer.icon = bundle.icon || ''; peer.avatar = safeImage(bundle.avatar, AVATAR_MAX); peer.banner = safeImage(bundle.banner, BANNER_MAX); peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels); // 相手の認証済みプロフィール
       markConfirmed(peer, b.via === 'camera' ? 'qr' : 'none', now()); // 直接スキャンのみ対面QR
       carryLocalPeer(peer, ex);                      // 手元設定(表示名・可視化等)は再接続でも保全
       carryConfirmation(peer, ex);
@@ -344,13 +353,31 @@ const server = createServer(async (req, res) => {
       let requested = false;
       if (typeof bundle.invite_link === 'string' && bundle.invite_link) {
         try { const prof = await readProfile();
-          await sendConnectRequest({ identity: await identity(), toDeviceId: bundle.device_id, name: prof.name || '',
+          await sendConnectRequest({ identity: await identity(), toDeviceId: bundle.device_id, name: String(prof.name || '').trim(),
             token: bundle.invite_link, relayDir: RELAY, now }); requested = true; }
         catch (e) { warn(t('receiving connect requests'), e); }
+        // 相手の側ではまだ縁が無い（申し込みが承認されるまで）。それをこちらの画面に出し、届いていない
+        // 時はもう一度送れるようにする（中継で申し込みが落ちても、片側だけの縁に誰も気づかなかった 2026-11-28）。
+        // 相手から何か1通でも届けば、相手の側にも縁がある証拠なので外す（exchange.js の receiveInbox）。
+        peer.awaiting = { since: now(), token: bundle.invite_link, sent: requested };
+        await writePeer(id, peer);
       }
-      await replayStrays(id, bundle.device_id);
+      if (await replayStrays(id, bundle.device_id)) await receiveInbox({ identity: await identity(), peer, pairId: id, now }).catch(() => {});
       pushProfile(id); // つながった相手へ自分のプロフィールを届ける（鍵だけengageでも絵が出る）
       return json(res, 200, { id, verified: peer.verified, confirmed: peer.confirmed_by, requested });
+    }
+    // 申し込みをもう一度送る（相手の承認待ちのまま届いていない時）。合言葉は最初と同じもの。
+    if (url.pathname === '/api/connect/resend' && req.method === 'POST') {
+      const b = await body(req);
+      let peer; try { peer = await readPeer(String(b.id || '')); } catch { return json(res, 404, { error: 'not found' }); }
+      if (!peer.awaiting) return json(res, 400, { error: t('They have already approved you.') });
+      const prof = await readProfile();
+      try { await sendConnectRequest({ identity: await identity(), toDeviceId: peer.device_id, name: String(prof.name || '').trim(),
+        token: peer.awaiting.token, relayDir: RELAY, now }); }
+      catch (e) { return json(res, 502, { error: e.message }); }
+      peer.awaiting = { ...peer.awaiting, sent: true, resent_at: now() };
+      await writePeer(String(b.id), peer);
+      return json(res, 200, { resent: true });
     }
     // この相手の"こちら側だけの呼び名"を設定/解除（空で相手の署名済み名に戻る）。
     if (url.pathname === '/api/rename' && req.method === 'POST') {
@@ -451,7 +478,7 @@ const server = createServer(async (req, res) => {
       if (!bundle?.device_id) return json(res, 400, { error: 'invalid bundle' });
       let ex = null; try { ex = await readPeer(b.id); } catch {}
       await ensurePair(b.id); const peer = engagePeer({ pairId: b.id, bundle }); peer.engaged_at = now();
-      peer.name = bundle.name || ''; peer.icon = bundle.icon || ''; peer.avatar = safeImage(bundle.avatar, AVATAR_MAX); peer.banner = safeImage(bundle.banner, BANNER_MAX); peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels);
+      peer.name = String(bundle.name || '').trim().slice(0, 40); peer.icon = bundle.icon || ''; peer.avatar = safeImage(bundle.avatar, AVATAR_MAX); peer.banner = safeImage(bundle.banner, BANNER_MAX); peer.links = bundle.links || ''; peer.channels = sanitizeChannels(bundle.channels);
       carryLocalPeer(peer, ex);                      // 手元設定は再接続でも保全
       carryConfirmation(peer, ex);
       await writePeer(b.id, peer); await logEvent(b.id, { type: 'engaged', peer: peer.device_id }, now());

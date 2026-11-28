@@ -210,6 +210,7 @@ function renderList(){
       const g=el('div','grow');const r1=el('div','r1');const n=el('div','nm'+(p.unread?' unread':''));n.textContent=p.label||nm(p.id);const tm=el('div','time');tm.textContent=ts(p.lastActivity);r1.append(n,tm);
       // 連絡先に載っている＝engaged なので、状態のラベルは出さない（到達可否だけ）。
       const r2=el('div','r2');const s2=el('span');s2.textContent=p.online?t('Reachable'):t('Away');r2.append(s2);
+      if(p.awaiting){const w=el('span');w.style.cssText='color:#c05621;font-weight:700';w.textContent=t('Waiting for them to approve');r2.append(w);}  // 片側だけの縁
       g.append(r1,r2);row.append(av,g);L.append(row);
     });
   }else{
@@ -352,7 +353,7 @@ async function renderMain(){
     if(imgOk(p.banner)){const bn=el('div','detail-banner');const im=el('img');im.src=p.banner;bn.append(im);M.append(bn);}
     const av=avaInto(el('div','m-ava'),{avatar:p.avatar,icon:p.icon,text:nm(sel.pair).slice(0,2).toUpperCase()});av.style.background=color(sel.pair);
     M.append(mHead(av,(p.label||nm(sel.pair)),(P.online?t('Reachable'):t('Away')),undefined,undefined,()=>openProfile(sel.pair)));
-    const body=el('div','m-body');
+    const body=el('div','m-body');{const aw=typeof awaitingCard==='function'?awaitingCard(P,sel.pair):null;if(aw)body.append(aw);}
     // やり取り履歴（日付ごと・10件ずつ・最新ページから遡る）＝voice-code版と同じ見せ方。
     const msgsAll=P.messages||[];
     if(msgsAll.length){

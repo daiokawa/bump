@@ -221,6 +221,7 @@
       <div class="t" data-s="pairs" data-ja="連絡先">Contacts</div>
       <div class="t" data-s="sent" data-ja="履歴">Sent</div>
     </div>
+    <div id="autoBox" class="pendbox" style="display:none"></div>
     <div id="pendingBox" class="pendbox" style="display:none"></div>
     <div id="pkgBox" class="pkgbox" style="display:none"></div>
     <div class="list" id="list"></div>
@@ -275,10 +276,12 @@
     <button class="segbtn" id="toggleQR" data-ja="目の前の相手と QR でつなぐ ▾">Connect by QR, face to face ▾</button>
     <div id="qrSection" style="display:none;text-align:center"><div class="qrwrap"><img id="qrImg" alt="QR"></div><div class="exp" id="qrExp"></div></div>
     <button class="link" id="pasteLink" data-ja="受け取ったリンク／QR内容を貼り付ける">Paste a link or QR contents you received</button>
+    <div id="recentInv"></div>
     </div>
     <div id="pasteBox" style="display:none">
       <div class="ilabel" data-ja="受け取った招待リンク（またはQRの中身）">The invite link (or QR contents) you received</div>
       <textarea class="setin" id="pasteIn" rows="4" spellcheck="false"></textarea>
+      <div id="pasteNameRow" style="display:none;margin-top:10px"><div class="ilabel" data-ja="あなたの名前（相手の画面に出ます）">Your name (shown to them)</div><input class="setin" id="pasteName" maxlength="40"></div>
       <div class="exp" data-ja="貼り付けでつないだ相手は「確認なし」になります。あとで番号の読み合わせなどで確かめられます。">Someone connected by pasting is marked "not confirmed". You can confirm later, for example by reading numbers aloud.</div>
       <div class="cropacts" style="margin-top:12px"><button class="btn decline" id="pasteBack" style="flex:1" data-ja="← 戻る">← Back</button><button class="btn apply" id="pasteGo" style="flex:1" data-ja="つなぐ">Connect</button></div>
     </div>
@@ -286,9 +289,10 @@
 
 <script src="/console-i18n.js?v=20261015a"></script>
 <script src="/console-base.js?v=20260815a"></script>
-<script src="/console-ui.js?v=20261128a"></script>
+<script src="/console-ui.js?v=20261128b"></script>
 <script src="/console-modals.js?v=20261015a"></script>
 <script src="/console-settings.js?v=20261015a"></script>
 <script src="/console.js?v=20261015a"></script>
+<script src="/console-connect.js?v=20261128a"></script>
 </body>
 </html>

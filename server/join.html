@@ -21,52 +21,104 @@
   button{margin-top:22px;background:var(--blue);color:#fff;border:0;border-radius:12px;padding:13px 26px;
     font-size:14px;font-weight:600;cursor:pointer}
   .err{color:var(--red)}
+  .fld{width:100%;margin-top:10px;padding:12px 14px;border:1px solid var(--line);border-radius:11px;font-size:15px}
+  .ghost{margin-top:8px;background:#eef2f6;color:var(--ink);padding:9px 16px;font-size:13px}
+  .pick{width:72px;height:72px;border-radius:50%;object-fit:cover;margin:8px auto 0}
+  button:disabled{opacity:.45;cursor:default}
 </style>
 </head>
 <body>
   <div class="box" id="box"><div class="sub" data-ja="つないでいます…">Connecting…</div></div>
 <script>
+// 招待リンクを開いた側の画面。相手を連絡先に入れ、合言葉つきで接続を申し込む。
+// 自分の名前が空のままだと、相手の画面に名無しで届く（2026-11-28 実際に起きた）。先に名前を決めてもらう。
 // English is the source; ja-locale browsers get the Japanese from the dict below.
 const JA=/^ja/i.test(navigator.language||'');
 const JADICT={
   'Could not connect':'つながれませんでした',
   'Open bump':'bumpを開く',
-  'Invalid invite link.':'招待リンクが不正です。',
+  'Invalid invite link.':'招待リンクが正しくありません。',
   'Could not read the invite link.':'招待リンクを読めませんでした。',
   'This invite link has expired (10 minutes). Ask them to send a new one.':'この招待リンクは期限切れです（10分）。相手に新しいリンクを送ってもらってください。',
-  'Could not verify the invite link.':'招待リンクの検証に失敗しました。',
+  'Could not verify the invite link.':'招待リンクを確かめられませんでした。',
+  'An invite from {name}':'{name} さんからの招待です',
+  'First, your name':'はじめに、あなたの名前を',
+  'This is how you appear on {name}\'s screen. You can change it later.':'{name} さんの画面に、この名前で出ます。あとから変えられます。',
+  'Your name':'あなたの名前',
+  'Icon (optional)':'アイコン（任意）',
+  'Choose an image':'画像を選ぶ',
+  'Save and connect':'保存してつながる',
+  'Please enter your name.':'名前を入れてください。',
+  'Request sent to {name}':'{name} さんに申し込みました',
+  'Your invite code matches, so you will be connected as soon as their bump receives it (about a minute). Letters you send now are delivered then.':'合言葉が合っているので、相手の bump が受け取るとつながります（1分ほど）。今送った手紙も、そのときに届きます。',
+  'Could not send the request. Open bump and press "Send the request again" on their contact.':'申し込みを送れませんでした。bump を開き、相手の連絡先の「申し込みをもう一度送る」を押してください。',
   'Connected':'つながりました',
-  'They are in your list as engaged. You can now exchange letters, asynchronously.':'相手を連絡先に追加しました。これで手紙をやり取りできます。',
-  'How confirmed: not confirmed (connected by link)':'確認の方法：確認なし（リンクで接続）'
+  'They are in your list. You can now exchange letters.':'相手を連絡先に追加しました。これで手紙をやり取りできます。',
 };
 const t=s=>JA?(JADICT[s]||s):s;
+const tf=(s,v)=>{let o=t(s);for(const k in v)o=o.split('{'+k+'}').join(v[k]);return o;};
 const el=(t,c)=>{const n=document.createElement(t);if(c)n.className=c;return n;};
-function show(nodes){const b=document.getElementById('box');b.textContent='';nodes.forEach(n=>b.append(n));}
+function show(nodes){const b=document.getElementById('box');b.textContent='';nodes.forEach(n=>n&&b.append(n));}
 function fail(msg){
   const h=el('h1');h.textContent=t('Could not connect');const s=el('div','sub err');s.textContent=msg;
   const btn=el('button');btn.textContent=t('Open bump');btn.onclick=()=>location.href='/';
   show([h,s,btn]);
 }
+const post=async(p,o)=>{const r=await fetch(p,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(o)});const j=await r.json().catch(()=>({}));if(!r.ok&&!j.error)j.error='HTTP '+r.status;return j;};
+// 画像を256pxの正方形に縮めて data URI にする（プロフィールの上限に収める）。
+function shrink(file){return new Promise((res,rej)=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=c.height=256;
+  const s=Math.min(img.width,img.height);c.getContext('2d').drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,256,256);res(c.toDataURL('image/jpeg',.85));};img.onerror=rej;img.src=URL.createObjectURL(file);});}
+function avaOf(name){const a=el('div','ava');a.textContent=[...(name||'?')][0];return a;}
+
+// 名前が空なら、ここで決めてもらう（決めるまで申し込まない）。
+function askName(inviter){return new Promise((resolve)=>{
+  const h=el('h1');h.textContent=t('First, your name');
+  const s=el('div','sub');s.textContent=tf('This is how you appear on {name}\'s screen. You can change it later.',{name:inviter});
+  const inp=el('input','fld');inp.placeholder=t('Your name');inp.maxLength=40;
+  const lab=el('div','sub');lab.style.marginTop='14px';lab.textContent=t('Icon (optional)');
+  const pic=el('img','pick');pic.alt='';pic.style.display='none';
+  const file=el('input');file.type='file';file.accept='image/*';file.style.display='none';
+  const choose=el('button','ghost');choose.type='button';choose.textContent=t('Choose an image');choose.onclick=()=>file.click();
+  let avatar='';file.onchange=async()=>{try{avatar=await shrink(file.files[0]);pic.src=avatar;pic.style.display='block';}catch{}};
+  const err=el('div','sub err');
+  const go=el('button');go.textContent=t('Save and connect');
+  go.onclick=async()=>{const name=inp.value.trim();if(!name){err.textContent=t('Please enter your name.');return;}
+    go.disabled=true;const r=await post('/api/profile',{name,...(avatar?{avatar}:{})});
+    if(r.error){err.textContent=r.error;go.disabled=false;return;}resolve(name);};
+  inp.onkeydown=(e)=>{if(e.key==='Enter')go.click();};
+  show([avaOf(inviter),h,s,inp,lab,pic,choose,file,err,go]);inp.focus();
+});}
+
 (async()=>{
-  const m=location.hash.match(/i=([A-Za-z0-9\-_]+)/);
-  if(!m)return fail(t('Invalid invite link.'));
+  // 招待の中身は fragment（#i=…）。履歴・スクショに残らないよう読んだらすぐ消すが、
+  // 名前を入れている途中で読み込み直しても続けられるよう、このタブの中だけに控えておく。
+  let raw=(location.hash.match(/i=([A-Za-z0-9\-_]+)/)||[])[1]||sessionStorage.getItem('bump-join')||'';
+  if(!raw)return fail(t('Invalid invite link.'));
+  sessionStorage.setItem('bump-join',raw);
   let bundle;
   // atob は1バイト＝1文字で返すので、そのまま JSON にすると日本語の名前が化けて署名が合わない
   // （テスターの方の切り分け 2026-10-30）。UTF-8 として読み直す。
-  try{ const bin=atob(m[1].replace(/-/g,'+').replace(/_/g,'/')); bundle=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0)))); }catch(e){ return fail(t('Could not read the invite link.')); }
-  // fragmentは履歴・スクショに残り得るので即消す（codexレビュー）
+  try{ const bin=atob(raw.replace(/-/g,'+').replace(/_/g,'/')); bundle=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0)))); }catch(e){ return fail(t('Could not read the invite link.')); }
   try{ history.replaceState(null,'',location.pathname); }catch(e){}
-  const r=await (await fetch('/api/scan',{method:'POST',headers:{'content-type':'application/json'},
-    body:JSON.stringify({bundle,via:'link'})})).json();
+  const inviter=String(bundle.name||'').trim()||(bundle.device_id||'').slice(0,6);
+  if(Date.parse(bundle.expires_at)<Date.now()){sessionStorage.removeItem('bump-join');return fail(t('This invite link has expired (10 minutes). Ask them to send a new one.'));}
+  const me=await fetch('/api/profile').then(r=>r.json()).catch(()=>({}));
+  if(!String(me.name||'').trim())await askName(inviter);
+  show([avaOf(inviter),Object.assign(el('div','sub'),{textContent:'…'})]);
+  const r=await post('/api/scan',{bundle,via:'link'});
+  sessionStorage.removeItem('bump-join');
   if(r.key_changed){ return fail(r.error); }   // 既存の縁と鍵が違う＝黙って繋ぎ直さない（文言はサーバ側で翻訳済み）
   if(r.error){ return fail(r.error==='expired'?t('This invite link has expired (10 minutes). Ask them to send a new one.'):t('Could not verify the invite link.')); }
-  const dev=(bundle.device_id||'').slice(0,2).toUpperCase();
-  const ava=el('div','ava');ava.textContent=dev||'?';
-  const h=el('h1');h.textContent=t('Connected');
-  const s=el('div','sub');s.textContent=t('They are in your list as engaged. You can now exchange letters, asynchronously.');
-  const tag=el('div','tag eng');tag.textContent=t('How confirmed: not confirmed (connected by link)');
+  const h=el('h1'),s=el('div','sub');
+  if(bundle.invite_link){
+    h.textContent=tf('Request sent to {name}',{name:inviter});
+    s.textContent=r.requested?t('Your invite code matches, so you will be connected as soon as their bump receives it (about a minute). Letters you send now are delivered then.')
+      :t('Could not send the request. Open bump and press "Send the request again" on their contact.');
+    if(!r.requested)s.className='sub err';
+  }else{ h.textContent=t('Connected'); s.textContent=t('They are in your list. You can now exchange letters.'); }
   const btn=el('button');btn.textContent=t('Open bump');btn.onclick=()=>location.href='/';
-  show([ava,h,s,tag,btn]);
+  const top=el('div','sub');top.textContent=tf('An invite from {name}',{name:inviter});
+  show([avaOf(inviter),top,h,s,btn]);
 })();
 </script>
 <script>
