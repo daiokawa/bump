@@ -54,21 +54,23 @@ function collectChannels(){const out=[];CH_PRESETS.forEach(p=>{const cb=$('ch_'+
   const ocb=$('ch_other'),ov=($('chv_other').value||'').trim(),ol=($('chl_other').value||'').trim();if(ocb&&ocb.checked&&ov)out.push({key:'other',label:ol||t('Other'),value:ov});return out;}
 // 照会ログ（別経路で連絡しに行った過去の行為）。「確認済み」等の状態は出さない。
 
-let invTimer=null,qrLoaded=false;
-// 開くたびに新しいリンクを作る。届くまでは古いリンクを見せず、コピーもさせない（期限切れを写さない）。
-async function makeInvite(){
+let invTimer=null,qrLoaded=false,lastInv=null;
+// まだ1分以上使える招待リンクがあれば、それをそのまま見せる（開くたびに作ると、使われない
+// 期限切れのリンクが増えていた）。届くまでは古いリンクを見せず、コピーもさせない（期限切れを写さない）。
+async function makeInvite(fresh){
   const box=$('inviteLink'),cp=$('copyBtn'),ex=$('inviteExp');clearInterval(invTimer);
   box.value=t('Making a link…');cp.disabled=true;ex.textContent='';$('reInvite').style.display='none';
-  let inv;try{const r=await fetch('/api/invite');if(!r.ok)throw new Error('HTTP '+r.status);inv=await r.json();}
-  catch(e){box.value='';ex.textContent=tf('Could not make a link: {msg}',{msg:e.message});$('reInvite').style.display='';return;}
+  let inv=(!fresh&&lastInv&&Date.parse(lastInv.expires_at)-Date.now()>60000)?lastInv:null;
+  if(!inv){try{const r=await fetch('/api/invite');if(!r.ok)throw new Error('HTTP '+r.status);inv=lastInv=await r.json();}
+    catch(e){box.value='';ex.textContent=tf('Could not make a link: {msg}',{msg:e.message});$('reInvite').style.display='';return;}}
   box.value=location.origin+'/join#i='+inv.token;cp.disabled=false;
   const tick=()=>{const s=Math.max(0,Math.round((Date.parse(inv.expires_at)-Date.now())/1000));
     if(s>0){ex.textContent=tf('Valid for {m}:{s}. When they open it, you are connected automatically within about a minute.',{m:Math.floor(s/60),s:String(s%60).padStart(2,'0')});return;}
     clearInterval(invTimer);ex.textContent=t('This link has expired.');cp.disabled=true;$('reInvite').style.display='';};
   tick();invTimer=setInterval(tick,1000);
 }
-$('add').onclick=()=>{$('connScrim').classList.add('on');showPaste(false);qrLoaded=false;$('qrSection').style.display='none';$('toggleQR').textContent=t('Connect in person with QR ▾');makeInvite();};
-$('reInvite').onclick=()=>makeInvite();
+$('add').onclick=()=>{$('connScrim').classList.add('on');$('inviteLink').value='';qrLoaded=false;$('qrSection').style.display='none';$('toggleQR').textContent=t('Connect in person with QR ▾');showPaste(false);};
+$('reInvite').onclick=()=>makeInvite(true);
 $('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('inviteLink').value);}catch(e){$('inviteLink').select();document.execCommand('copy');}toast(t('✓ Copied'));};
 $('toggleQR').onclick=async()=>{const s=$('qrSection');const showing=s.style.display!=='none';s.style.display=showing?'none':'block';$('toggleQR').textContent=showing?t('Connect in person with QR ▾'):t('Connect in person with QR ▴');
   if(!showing&&!qrLoaded)loadQR();};
@@ -82,10 +84,11 @@ async function loadQR(){clearInterval(qrTimer);$('qrImg').style.opacity='.25';
       const b=el('button','link');b.textContent=t('Make a new QR code');b.onclick=()=>loadQR();ex.append(b);};
     tick();qrTimer=setInterval(tick,1000);}
   catch(e){$('qrExp').textContent=tf('Could not make a link: {msg}',{msg:e.message});}}
-// 受け取ったリンクを貼る：小窓の中で切り替える（← 戻る で招待リンクの画面へ）。
-function showPaste(on){$('connMain').style.display=on?'none':'';$('pasteBox').style.display=on?'':'none';if(on){$('pasteIn').value='';$('pasteIn').focus();}}
-$('pasteLink').onclick=()=>showPaste(true);
-$('pasteBack').onclick=()=>showPaste(false);
+// 送る／受け取った、の2択を小窓の上で切り替える。受け取った側に招待リンクを作らない。
+function showPaste(on){$('connMain').style.display=on?'none':'';$('pasteBox').style.display=on?'':'none';
+  [...$('connTabs').children].forEach(x=>x.classList.toggle('active',(x.dataset.m==='recv')===!!on));
+  if(on){$('pasteIn').value='';$('pasteIn').focus();}else if(!$('inviteLink').value||$('copyBtn').disabled)makeInvite();}
+$('connTabs').onclick=(e)=>{const m=e.target.closest('.t')?.dataset.m;if(m)showPaste(m==='recv');};
 $('pasteGo').onclick=async()=>{const raw=$('pasteIn').value.trim();if(!raw){toast(t('Paste a link first.'),'err');return;}
   let bundle=raw;const m=raw.match(/i=([A-Za-z0-9\-_]+)/);if(m){try{const bin=atob(m[1].replace(/-/g,'+').replace(/_/g,'/'));bundle=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))));}catch(e){}}/* UTF-8として読む（日本語の名前で署名が合わなくなっていた） */
   const b=$('pasteGo');b.disabled=true;

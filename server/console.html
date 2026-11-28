@@ -135,6 +135,14 @@
   .setin{width:100%;padding:11px 12px;border:1px solid var(--line2);border-radius:9px;font-size:14px;font-family:inherit;background:#f7f9fc;color:var(--ink)}
   /* X方式：横長バナー＋正方形アイコン */
   .xprof{position:relative;margin-bottom:40px}
+  .metop{display:flex;gap:14px;align-items:flex-end;margin:6px 0 14px}
+  .avsq.avtop{position:relative;left:auto;bottom:auto;width:68px;height:68px;border:2px dashed #cdd8e3;flex-shrink:0}
+  details.fold{border:1px solid var(--line);border-radius:11px;padding:0 13px;margin-bottom:8px;background:#fbfcfe}
+  details.fold>summary{cursor:pointer;list-style:none;padding:11px 0;font-size:13px;font-weight:800;color:#46586a;display:flex;align-items:center;gap:8px}
+  details.fold>summary::before{content:'▸';color:var(--muted);font-size:11px}details.fold[open]>summary::before{content:'▾'}
+  details.fold[open]{padding-bottom:12px}
+  details.fold .fset{font-style:normal;font-size:11px;font-weight:700;color:var(--green);margin-left:auto}
+  .savebar{position:sticky;bottom:-24px;background:#fff;padding:12px 0 2px;margin-top:6px}
   .bndrop{height:120px;border:2px dashed #cdd8e3;border-radius:12px;overflow:hidden;position:relative;cursor:pointer;background:#f7f9fc;display:flex;align-items:center;justify-content:center;transition:.12s}
   .bndrop.over,.avsq.over{border-color:var(--blue);background:#eef5ff}
   .bndrop img{display:none;width:100%;height:100%;object-fit:cover}.bndrop.has img{display:block}.bndrop.has .bnph{display:none}
@@ -243,7 +251,7 @@
     <div class="catseg" id="catSeg" style="display:none"><div class="t active" data-c="person"><span data-ja="人の手紙">From people</span><span class="cn"></span></div><div class="t" data-c="report"><span data-ja="自動報告">Automatic reports</span><span class="cn"></span></div></div>
     <div class="searchrow" id="searchRow"><div class="sq"><input id="inboxQ" type="search" autocomplete="off" spellcheck="false" placeholder="Search by sender or text" data-ja-placeholder="送り主・本文で探す" aria-label="Search the inbox"><span class="scount" id="searchCount"></span></div><select id="inboxSort" class="ssort" aria-label="Sort"><option value="todo" data-ja="まだを上に">To handle first</option><option value="new" data-ja="新しい順">Newest first</option><option value="old" data-ja="古い順">Oldest first</option><option value="sender" data-ja="送り主ごと">By sender</option></select></div>
     <div class="list" id="list"></div>
-    <div class="side-foot"><button class="tbtn addfull" id="add" data-ja="＋ ユーザー追加">＋ Add contact</button></div>
+    <div class="side-foot"><button class="tbtn addfull" id="add" data-ja="＋ 連絡先を追加">＋ Add contact</button></div>
   </div>
   <div class="main" id="main"></div>
 
@@ -254,48 +262,56 @@
 
   <div class="scrim" id="setScrim"><div class="dialog">
     <h3 class="dh" data-ja="プロフィール">Profile</h3><div class="dsub" data-ja="名前・アイコンは、つながる相手に伝わります（署名つき）。">Your name and icon are shared, signed, with the people you connect to.</div>
-    <div class="secthd" data-ja="相手に見えるもの">Shown to the people you connect with</div>
-    <div class="ilabel" data-ja="名前">Name</div><input class="setin" id="pName" placeholder="e.g. Alex Smith" data-ja-placeholder="例: 山田花子">
-    <div class="ilabel" style="margin-top:13px" data-ja="あなたの端末番号（鍵の指紋）">Your device number (key fingerprint)</div>
-    <div class="exp" style="margin:0 0 8px" data-ja="相手が承認の前に本人確認で聞いてくることがあります。そのときは電話やLINEでこの番号を読み上げてください。秘密ではないので伝えて構いません。">Before approving you, the other person may ask for this number to confirm it is you. Read it out over the phone or a chat app. It is not a secret.</div>
-    <div class="irow" style="align-items:center"><div class="fp" id="meFp" style="flex:1"></div><button type="button" class="btn decline" id="meFpCopy" style="min-width:0;padding:9px 13px;font-size:12.5px" data-ja="コピー">Copy</button></div>
-    <div class="ilabel" style="margin-top:13px" data-ja="プロフィール画像（バナー＋アイコン）">Profile images (banner + icon)</div>
-    <div class="xprof">
-      <div id="bnDrop" class="bndrop"><img id="bnImg" alt=""><div id="bnPh" class="bnph" data-ja="タイトルバナー（横長）をドロップ／クリック">Drop or click to set a banner (wide)</div><button type="button" id="bnClear" class="imgclear">×</button></div>
-      <div id="avDrop" class="avsq"><img id="avImg" alt=""><div id="avPh" class="avph2" data-ja="アイコン">Icon</div><button type="button" id="avClear" class="imgclear">×</button></div>
+    <div class="metop">
+      <div id="avDrop" class="avsq avtop"><img id="avImg" alt=""><div id="avPh" class="avph2" data-ja="アイコン">Icon</div><button type="button" id="avClear" class="imgclear">×</button></div>
+      <div style="flex:1;min-width:0"><div class="ilabel" data-ja="名前">Name</div><input class="setin" id="pName" placeholder="e.g. Alex Smith" data-ja-placeholder="例: 山田花子"></div>
     </div>
     <input type="file" id="bnFile" accept="image/*" style="display:none">
     <input type="file" id="pImgFile" accept="image/*" style="display:none">
-    <div class="exp" data-ja="バナーは横長、アイコンは正方形。ドロップで差し替え、×で削除。縮小してローカル保存＋署名つきで相手に伝わります。">Banner is wide, icon is square. Drop to replace, × to remove. Shrunk, stored locally, and shared with your contacts, signed.</div>
+    <details class="fold" id="foldLook"><summary><span data-ja="バナー・リンク">Banner and links</span><em class="fset"></em></summary>
+      <div class="ilabel" data-ja="タイトルバナー（横長）">Banner (wide)</div>
+      <div class="xprof" style="margin-bottom:6px">
+      <div id="bnDrop" class="bndrop"><img id="bnImg" alt=""><div id="bnPh" class="bnph" data-ja="タイトルバナー（横長）をドロップ／クリック">Drop or click to set a banner (wide)</div><button type="button" id="bnClear" class="imgclear">×</button></div>
+      </div>
     <div class="ilabel" style="margin-top:13px" data-ja="リンク（1行に1つ・任意）">Links (one per line, optional)</div>
     <textarea class="setin" id="pLinks" rows="3" placeholder="https://…" style="resize:vertical"></textarea>
+    </details>
+    <details class="fold" id="foldCh"><summary><span data-ja="本人確認の連絡経路">Contact channels for verifying you</span><em class="fset"></em></summary>
     <div class="ilabel" style="margin-top:15px" data-ja="連絡経路（本人確認で相手が開くツール）">Contact channels (what the other person opens to verify you)</div>
     <div class="exp" style="margin:0 0 9px" data-ja="相手があなたを別経路で本人確認するとき、ここで選んだツールが相手の画面で開きます。使うものにチェックを入れて、リンク／IDを入れてください。">When someone verifies you over another channel, the tools you pick here open on their screen. Check the ones you use and add a link or ID.</div>
     <div id="chList"></div>
-    <div class="secthd" style="margin-top:22px" data-ja="このMacの中だけ（相手には伝わりません）">Only on this Mac (never shared)</div>
+    </details>
+    <details class="fold" id="foldCw"><summary><span data-ja="スマホに通知（Chatwork）">Phone alerts (Chatwork)</span><em class="fset"></em></summary>
     <div class="ilabel" style="margin-top:15px" data-ja="新着通知をChatworkにも送る（任意）">Also send new-arrival alerts to Chatwork (optional)</div>
     <div class="exp" style="margin:0 0 9px" data-ja="新着があったとき「誰から何件」だけをChatworkに送ります（本文は送りません）。トークンはこのMacにだけ保存され、相手には伝わりません。マイチャット宛にすればスマホにプッシュが届きます。">When something arrives, only "who and how many" goes to Chatwork — never the letter itself. The token stays on this Mac and is never shared. Point it at My Chat and your phone gets a push.</div>
     <div class="irow"><input class="setin" id="cwToken" type="password" placeholder="Chatwork API token" data-ja-placeholder="Chatwork APIトークン" autocomplete="off" spellcheck="false"><button type="button" class="btn decline" id="cwShow" style="min-width:0;padding:11px 14px" data-ja="表示">Show</button></div>
     <input class="setin" id="cwRoom" placeholder="Room ID (the My Chat number)" data-ja-placeholder="ルームID（マイチャットの数字）" style="margin-top:8px">
     <input class="setin" id="cwAccount" placeholder="Account ID (optional; adds To so your phone gets pushed)" data-ja-placeholder="アカウントID（任意・入れるとTo付きでスマホ通知が届く）" style="margin-top:8px">
+    </details>
+    <details class="fold" id="foldDev"><summary><span data-ja="端末番号・ブロック中の相手">Device number and blocked contacts</span></summary>
+    <div class="ilabel" style="margin-top:13px" data-ja="あなたの端末番号（鍵の指紋）">Your device number (key fingerprint)</div>
+    <div class="exp" style="margin:0 0 8px" data-ja="相手が承認の前に本人確認で聞いてくることがあります。そのときは電話やLINEでこの番号を読み上げてください。秘密ではないので伝えて構いません。">Before approving you, the other person may ask for this number to confirm it is you. Read it out over the phone or a chat app. It is not a secret.</div>
+    <div class="irow" style="align-items:center"><div class="fp" id="meFp" style="flex:1"></div><button type="button" class="btn decline" id="meFpCopy" style="min-width:0;padding:9px 13px;font-size:12.5px" data-ja="コピー">Copy</button></div>
     <div id="blockWrap" style="display:none">
       <div class="ilabel" style="margin-top:15px" data-ja="ブロック中の相手">Blocked contacts</div>
       <div class="exp" style="margin:0 0 9px" data-ja="この相手からの接続リクエストは届いた瞬間に捨てられます。">Connection requests from them are dropped the moment they arrive.</div>
       <div id="blockList"></div>
     </div>
-    <button class="btn apply" id="pSave" style="width:100%;margin-top:15px;min-width:0" data-ja="保存">Save</button>
+    </details>
+    <div class="savebar"><button class="btn apply" id="pSave" style="width:100%;min-width:0" data-ja="保存">Save</button></div>
   </div></div>
 
   <div class="scrim" id="connScrim"><div class="dialog">
-    <h3 class="dh" data-ja="つながる">Connect</h3><div class="dsub" data-ja="離れた相手には招待リンク、目の前ならQR。">Invite link for someone far away. QR for someone in front of you.</div>
+    <h3 class="dh" data-ja="連絡先を追加">Add contact</h3>
+    <div class="seg" id="connTabs" style="margin:10px 0 14px"><div class="t active" data-m="send" data-ja="招待を送る">Send an invite</div><div class="t" data-m="recv" data-ja="招待を受け取った">I received one</div></div>
     <div id="connMain">
+    <div class="dsub" style="margin-bottom:10px" data-ja="離れた相手には招待リンク、目の前ならQR。">Invite link for someone far away. QR for someone in front of you.</div>
     <div class="ilabel" data-ja="招待リンク（LINE等で送る）">Invite link (send it over chat)</div>
     <div class="irow"><input id="inviteLink" readonly><button class="btn apply" style="min-width:0;padding:11px 15px" id="copyBtn" data-ja="コピー">Copy</button></div>
     <div class="exp" id="inviteExp"></div>
     <button class="btn decline" id="reInvite" style="display:none;min-width:0;padding:9px 14px;font-size:13px;margin-bottom:8px" data-ja="新しいリンクを作る">Make a new link</button>
     <button class="segbtn" id="toggleQR" data-ja="目の前の相手と QR でつなぐ ▾">Connect by QR, face to face ▾</button>
     <div id="qrSection" style="display:none;text-align:center"><div class="qrwrap"><img id="qrImg" alt="QR"></div><div class="exp" id="qrExp"></div></div>
-    <button class="link" id="pasteLink" data-ja="受け取ったリンク／QR内容を貼り付ける">Paste a link or QR contents you received</button>
     <div id="recentInv"></div>
     </div>
     <div id="pasteBox" style="display:none">
@@ -303,7 +319,7 @@
       <textarea class="setin" id="pasteIn" rows="4" spellcheck="false"></textarea>
       <div id="pasteNameRow" style="display:none;margin-top:10px"><div class="ilabel" data-ja="あなたの名前（相手の画面に出ます）">Your name (shown to them)</div><input class="setin" id="pasteName" maxlength="40"></div>
       <div class="exp" data-ja="貼り付けでつないだ相手は「確認なし」になります。あとで番号の読み合わせなどで確かめられます。">Someone connected by pasting is marked "not confirmed". You can confirm later, for example by reading numbers aloud.</div>
-      <div class="cropacts" style="margin-top:12px"><button class="btn decline" id="pasteBack" style="flex:1" data-ja="← 戻る">← Back</button><button class="btn apply" id="pasteGo" style="flex:1" data-ja="つなぐ">Connect</button></div>
+      <div class="cropacts" style="margin-top:12px"><button class="btn apply" id="pasteGo" style="flex:1" data-ja="つなぐ">Connect</button></div>
     </div>
   </div></div>
 

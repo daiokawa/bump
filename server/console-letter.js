@@ -35,6 +35,7 @@ Object.assign(I18N_JA, {
   'Or write it in your own words': '自分の言葉で書く場合はこちら',
   'Declined. They were told.': '読ませないことにしました。相手に伝わります。',
   'Not this one': '読ませない',
+  'Set': '設定済み',
 });
 
 function letterState(it) {

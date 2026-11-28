@@ -234,6 +234,9 @@ function openVerify(pair,id,L){
 $('settings').onclick=async()=>{const p=await (await fetch('/api/profile')).json();$('pName').value=p.name||'';$('pLinks').value=p.links||'';avatarData=p.avatar||'';bannerData=p.banner||'';renderPics();populateChannels(p.channels);
   const nc=await (await fetch('/api/notify')).json().catch(()=>({}));$('cwToken').value=nc.chatworkToken||'';$('cwToken').type='password';$('cwShow').textContent=t('Show');$('cwRoom').value=nc.chatworkRoom||'';$('cwAccount').value=nc.chatworkAccount||'';
   renderBlocked();
+  // 畳んだ引き出しは毎回閉じて開く。中身を入れてあるものにだけ「設定済み」と小さく出す。
+  {const mark=(id,on)=>{const d=$(id);d.open=false;const e=d.querySelector('.fset');if(e)e.textContent=on?t('Set'):'';};
+    mark('foldLook',!!(p.banner||(p.links||'').trim()));mark('foldCh',!!(p.channels&&p.channels.length));mark('foldCw',!!(nc.chatworkToken&&nc.chatworkRoom));mark('foldDev',false);}
   // 自分の指紋（相手の本人確認に答えるための番号）。state から取る＝常に手元の鍵の値。
   try{const st=await (await fetch('/api/state')).json();$('meFp').textContent=fpGroups(st.me&&st.me.device_id);}catch{}
   $('setScrim').classList.add('on');};
