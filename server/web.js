@@ -37,6 +37,7 @@ const { freeBytes, hasRoom, humanBytes, MIN_FREE_BYTES } = await import('../lib/
 const { staleMcp } = await import('../lib/stale-mcp.js');
 const { appVersion } = await import('../lib/version.js');
 const { approveRequest, autoApprovePending, readAuto, writeAuto } = await import('../lib/approve.js');
+const { pairNameFor } = await import('../lib/resolve.js');
 const { receiveConnectRequests, listPending, readPending, dropPending, sendConnectRequest,
   readBlocked, blockDevice, unblockDevice } = await import('../lib/connect.js');
 const { matchInvite, markInviteUsed, inviteConflict, newLinkInvite, linkClaims, recentLinks } = await import('../lib/invite.js');
@@ -333,7 +334,8 @@ const server = createServer(async (req, res) => {
       const bundle = typeof b.bundle === 'string' ? JSON.parse(b.bundle) : b.bundle;
       const chk = verifyBundle(bundle, now());
       if (!chk.ok) return json(res, 400, { error: chk.reason });
-      const id = b.id || `pair-${bundle.device_id.slice(0, 6)}`;
+      // 縁の名前は相手の名乗りで（pair-xxxx だと、手元のAIが相手の名前で送れなかった 2026-11-28）。
+      const id = String(b.id || '').trim() || await pairNameFor(bundle.name, bundle.device_id);
       // 既存peerの鍵変更はブロック（再Engage扱い）＝codexレビュー。
       let ex = null;
       try {

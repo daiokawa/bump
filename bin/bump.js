@@ -44,6 +44,7 @@ import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
 import { takeDaemonLock, ownsDaemonLock } from '../lib/single.js';
 import { relayUrls, editRelays } from '../lib/relays.js';
 import { handleConnectRequests, listPending } from '../lib/connect.js';
+import { resolvePair } from '../lib/resolve.js';
 import { autoApprovePending, readAuto, writeAuto } from '../lib/approve.js';
 import { t, tf } from '../lib/i18n.js';
 
@@ -61,6 +62,9 @@ async function loadIdentity() {
 // 縁があること（engaged）だけを要求する。かつては safety number 突合(verified)を必須にしていたが、
 // 本人確認は専用パッケージの合言葉が担うようになり、画面・MCPも engaged で動く。
 // CLIだけ止まると「画面からは送れるのにコマンドは弾かれる」ちぐはぐになるので揃える。
+// 縁の名前か相手の名前から、縁の名前を引く。見つからない・同じ名前が複数の時は、候補を見せて止まる。
+async function pair(input) { if (input === undefined) return input; try { return await resolvePair(input); } catch (e) { die(e.message); } }
+
 async function requirePeer(pairId) {
   if (!(await hasPeer(pairId))) die(tf('Pair "{pair}" not registered. Run `bump engage {pair} --bundle ...` first', { pair: pairId }));
   return readPeer(pairId);
@@ -615,6 +619,8 @@ async function main() {
   const [cmd, ...raw] = process.argv.slice(2);
   const { flags, rest } = parseFlags(raw);
   switch (cmd) {
+    // 既存の縁を指す引数は、縁の名前でも相手の名前（プロフィール名）でも受ける（lib/resolve.js）。
+    // engage・invite・request は新しく名付ける側なので引かない。
     case 'init': return cmdInit();
     case 'id': return cmdId();
     case 'device': return cmdDevice();
@@ -625,19 +631,19 @@ async function main() {
     case 'invite': return cmdInvite(rest[0], flags);
     case 'engage': return cmdEngage(rest[0], flags);
     case 'request': return cmdRequest(rest[0], flags);
-    case 'package': return cmdPackage(rest[0], rest[1], flags);
+    case 'package': return cmdPackage(await pair(rest[0]), rest[1], flags);
     case 'packages': return cmdPackages();
-    case 'safety': return cmdSafety(rest[0]);
-    case 'verify': return cmdVerify(rest[0]);
-    case 'send': return cmdSend(rest[0], rest.slice(1));
-    case 'deliver': return cmdDeliver(rest[0], rest[1]);
-    case 'sync': return cmdSync(rest[0], rest[1]);
-    case 'watch': return cmdWatch(rest[0], rest[1], flags);
+    case 'safety': return cmdSafety(await pair(rest[0]));
+    case 'verify': return cmdVerify(await pair(rest[0]));
+    case 'send': return cmdSend(await pair(rest[0]), rest.slice(1));
+    case 'deliver': return cmdDeliver(await pair(rest[0]), rest[1]);
+    case 'sync': return cmdSync(await pair(rest[0]), rest[1]);
+    case 'watch': return cmdWatch(await pair(rest[0]), rest[1], flags);
     case 'daemon': return cmdDaemon(flags);
-    case 'receive': return cmdReceive(rest[0]);
+    case 'receive': return cmdReceive(await pair(rest[0]));
     case 'rally': return cmdRally(rest[0], rest[1], flags);
-    case 'read': return cmdRead(rest[0], rest[1]);
-    case 'log': return cmdLog(rest[0], flags);
+    case 'read': return cmdRead(await pair(rest[0]), rest[1]);
+    case 'log': return cmdLog(await pair(rest[0]), flags);
     case 'pairs': return cmdPairs();
     case 'relays': return cmdRelays(rest[0], rest[1]);
     default:

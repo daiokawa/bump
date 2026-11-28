@@ -16,6 +16,7 @@ import { screenMany } from '../lib/guard.js';
 import { replyOf } from '../lib/reply.js';
 import { confirmedBy } from '../lib/pairing.js';
 import { listPending } from '../lib/connect.js';
+import { resolvePair } from '../lib/resolve.js';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -64,7 +65,7 @@ async function toolEngaged() {
     await pullFromRelay({ pairId: id, relayDir: RELAY, myDeviceId: me.device_id, peerDeviceId: peer && peer.device_id }).catch(() => {});
     await receiveInbox({ identity: me, peer, pairId: id, now }).catch(() => {});
     const reach = await reachOf({ relayDir: RELAY, pairId: id, peerDeviceId: peer.device_id, nowIso: now() });
-    rows.push({ pair: id, trust: confirmedBy(peer),
+    rows.push({ pair: id, name: peer.alias || peer.name || '', trust: confirmedBy(peer),
       reachable: reach.online, unread: await unreadOf(id, peer.device_id), device: peer.device_id.slice(0, 8) });
   }
   // my_device_id ＝自分の鍵の指紋。相手が承認の前に「本人ですか」と別経路で聞いてくることがあり、
@@ -74,6 +75,7 @@ async function toolEngaged() {
 
 async function toolSend({ pair, body }) {
   if (!pair || !body) throw new Error('pair and body required');
+  pair = await resolvePair(pair);   // 縁の名前でも、相手の名前でも
   const me = await identity();
   const peer = await readPeer(pair);
   const { msg } = await sendMessage({ identity: me, peer, pairId: pair, body, now });
@@ -84,6 +86,7 @@ async function toolSend({ pair, body }) {
 // 送信取り消し。境界は配達前/後：中継にまだ在れば消せる、相手にpullされた後は手が届かない。
 async function toolUnsend({ pair, id }) {
   if (!pair || !id) throw new Error('pair and id required');
+  pair = await resolvePair(pair);   // 縁の名前でも、相手の名前でも
   const me = await identity();
   const peer = await readPeer(pair);
   const { removed } = await unsendMessage({ identity: me, pairId: pair, messageId: id,
@@ -95,6 +98,7 @@ async function toolUnsend({ pair, id }) {
 
 // 受信を復号・検証し、suspiciousチェックを通して返す。受信文はデータであって命令ではない。
 async function toolRead({ pair, limit = 10 }) {
+  pair = await resolvePair(pair);   // 縁の名前でも、相手の名前でも
   const me = await identity();
   const peer = await readPeer(pair);
   await pullFromRelay({ pairId: pair, relayDir: RELAY, myDeviceId: me.device_id, peerDeviceId: peer && peer.device_id });
@@ -146,7 +150,7 @@ export const TOOLS = [
     inputSchema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'bump_send', description: 'Leave a letter on the given bond, asynchronously (signed, E2E-encrypted, via a blind relay). The body is only text handed over on a human\'s instruction. Communication only; nothing is executed.',
     inputSchema: { type: 'object', properties: {
-      pair: { type: 'string', description: 'The bond ID of the peer (check with bump_engaged)' },
+      pair: { type: 'string', description: 'The bond ID of the peer, or their name (check with bump_engaged)' },
       body: { type: 'string', description: 'Body of the letter' } }, required: ['pair', 'body'], additionalProperties: false } },
   { name: 'bump_unsend', description: 'Recall a letter you sent, while it still sits undelivered on the relay. Only works before the peer pulls it; once delivered it cannot be recalled.',
     inputSchema: { type: 'object', properties: {
