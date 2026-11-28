@@ -63,7 +63,7 @@ async function makeInvite(){
   catch(e){box.value='';ex.textContent=tf('Could not make a link: {msg}',{msg:e.message});$('reInvite').style.display='';return;}
   box.value=location.origin+'/join#i='+inv.token;cp.disabled=false;
   const tick=()=>{const s=Math.max(0,Math.round((Date.parse(inv.expires_at)-Date.now())/1000));
-    if(s>0){ex.textContent=tf('Valid for {m}:{s}. When they open it, their request appears here — approve it to connect.',{m:Math.floor(s/60),s:String(s%60).padStart(2,'0')});return;}
+    if(s>0){ex.textContent=tf('Valid for {m}:{s}. When they open it, you are connected automatically within about a minute.',{m:Math.floor(s/60),s:String(s%60).padStart(2,'0')});return;}
     clearInterval(invTimer);ex.textContent=t('This link has expired.');cp.disabled=true;$('reInvite').style.display='';};
   tick();invTimer=setInterval(tick,1000);
 }

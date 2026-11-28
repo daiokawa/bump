@@ -65,7 +65,7 @@ bash open-app.sh    # open the console window
 bash up.sh stop
 ```
 
-**Connecting to someone:** one of you opens *Add contact* in the console and sends the invite link (valid 10 minutes); the other opens it in a browser on their own Mac. The link carries a one-time code, so within a minute the person who made it sees a request marked *from your invite link* and approves it with one click. (A link can be seen by others, so nothing connects without that click.) You both need to be on at least one common relay (that is what the `relays add` line is for).
+**Connecting to someone:** one of you opens *Add contact* in the console and sends the invite link (valid 10 minutes); the other opens it in a browser on their own Mac. If your name is not set yet, the page asks for it first, so you never arrive nameless. The link carries a one-time code; when it matches, you are connected automatically within about a minute, and the person who made the link is told who connected. A link can be seen by others on the way, so they can release the bond on the spot if they do not know you. If two devices use the same link, neither is connected automatically; the person who made it decides. You both need to be on at least one common relay (that is what the `relays add` line is for).
 
 Use `npm ci`, not `npm install`. The latter rewrites `package-lock.json`, which is part of
 the signed content, so `bump verify-release` will then correctly report a mismatch (H.S.,

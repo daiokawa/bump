@@ -201,7 +201,7 @@ const I18N_JA = {
  "Name (e.g. Discord)": "名称（例：Discord）",
  "Other": "その他",
  "Link / ID": "リンク／ID",
- "Valid for {m}:{s}. When they open it, their request appears here — approve it to connect.": "残り {m}:{s} 有効。相手が開くと、ここに申し込みが届きます。承認するとつながります。",
+ "Valid for {m}:{s}. When they open it, you are connected automatically within about a minute.": "残り {m}:{s} 有効。相手が開くと、合言葉が合っていれば1分ほどで自動でつながります。",
  "Expired. Close and reopen.": "期限切れ。開き直してください。",
  "Copied": "済",
  "Copy": "コピー",
