@@ -1,5 +1,5 @@
 # 依存はclone後に npm install（テスターのClaudeが実行）
-node_modules/
+node_modules
 
 # 配布物・ビルド生成物（宛名入りパッケージは公開しない）
 dist/
