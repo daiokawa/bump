@@ -36,6 +36,8 @@ Object.assign(I18N_JA, {
   'Declined. They were told.': '読ませないことにしました。相手に伝わります。',
   'Not this one': '読ませない',
   'Set': '設定済み',
+  'An invite to connect on bump (valid for 10 minutes):': 'bump でつながるための招待です（10分有効）：',
+  'Could not share: {msg}': '共有できませんでした：{msg}',
 });
 
 function letterState(it) {

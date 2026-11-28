@@ -63,14 +63,20 @@ async function makeInvite(fresh){
   let inv=(!fresh&&lastInv&&Date.parse(lastInv.expires_at)-Date.now()>60000)?lastInv:null;
   if(!inv){try{const r=await fetch('/api/invite');if(!r.ok)throw new Error('HTTP '+r.status);inv=lastInv=await r.json();}
     catch(e){box.value='';ex.textContent=tf('Could not make a link: {msg}',{msg:e.message});$('reInvite').style.display='';return;}}
-  box.value=location.origin+'/join#i='+inv.token;cp.disabled=false;
+  box.value=location.origin+'/join#i='+inv.token;cp.disabled=false;$('shareBtn').disabled=false;
   const tick=()=>{const s=Math.max(0,Math.round((Date.parse(inv.expires_at)-Date.now())/1000));
     if(s>0){ex.textContent=tf('Valid for {m}:{s}. When they open it, you are connected automatically within about a minute.',{m:Math.floor(s/60),s:String(s%60).padStart(2,'0')});return;}
-    clearInterval(invTimer);ex.textContent=t('This link has expired.');cp.disabled=true;$('reInvite').style.display='';};
+    clearInterval(invTimer);ex.textContent=t('This link has expired.');cp.disabled=true;$('shareBtn').disabled=true;$('reInvite').style.display='';};
   tick();invTimer=setInterval(tick,1000);
 }
 $('add').onclick=()=>{$('connScrim').classList.add('on');$('inviteLink').value='';qrLoaded=false;$('qrSection').style.display='none';$('toggleQR').textContent=t('Connect in person with QR ▾');showPaste(false);};
 $('reInvite').onclick=()=>makeInvite(true);
+// 共有ボタン：使えるブラウザ（Mac の Safari・Chrome、スマホ）では共有シートから LINE などへ直接渡せる。
+// 使えなければ出さない（コピーだけ）。渡すのはリンクと一言だけ。
+if(navigator.share)$('shareBtn').style.display='';
+$('shareBtn').onclick=async()=>{const u=$('inviteLink').value;if(!u||$('copyBtn').disabled)return;
+  try{await navigator.share({title:'bump',text:t('An invite to connect on bump (valid for 10 minutes):'),url:u});}
+  catch(e){if(e&&e.name!=='AbortError')toast(tf('Could not share: {msg}',{msg:e.message}),'err');}};
 $('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('inviteLink').value);}catch(e){$('inviteLink').select();document.execCommand('copy');}toast(t('✓ Copied'));};
 $('toggleQR').onclick=async()=>{const s=$('qrSection');const showing=s.style.display!=='none';s.style.display=showing?'none':'block';$('toggleQR').textContent=showing?t('Connect in person with QR ▾'):t('Connect in person with QR ▴');
   if(!showing&&!qrLoaded)loadQR();};
