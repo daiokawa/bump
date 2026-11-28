@@ -50,7 +50,7 @@ cat ~/.bump/pairs/*/outbox/*.env.json* 2>/dev/null | head -12
 grep -rn "execFile\|spawn(" lib server bin | grep -v node_modules
 ```
 
-**期待される結果**：呼ぶのは5つだけ。`sudo` は一度も出てきません。
+**期待される結果**：呼ぶのは下の表のものだけ。`sudo` は一度も出てきません。
 
 | コマンド | いつ | なぜ |
 |---|---|---|
@@ -59,6 +59,9 @@ grep -rn "execFile\|spawn(" lib server bin | grep -v node_modules
 | `ps` | 画面を開いた時 | 起動中のclaudeタブを探す（`ps -axww -o tty,command`） |
 | `open` | あなたが「別経路で確認」を押した時だけ | LINE等のアプリを前面に出す |
 | `claude -p --allowedTools ''` | 手紙が届いた時 | 届いた文のinjection点検。**ツールを無効化**して呼ぶ |
+| `node bin/mcp-tools.js` | あなたのAIが bump の道具を呼ぶたび | 道具の中身を、その時点のディスク上の最新コードで動かす（MCP の入口 `bin/mcp.js` が起こす。2026-11-28 から） |
+| `git` | 1日1回と、画面の起動時 | 新しい版が出ていないかの確認（`git ls-remote` で GitHub の最新の番号だけを見る）と、動いている版の番号を調べる（`git rev-parse`） |
+| `codex` | 練習相手を使う時だけ | 既定では起動しない |
 
 最後の1つが気になる場合は `lib/guard.js` を読んでください（29行）。渡すのは点検用のプロンプトと手紙の本文だけで、`--allowedTools ''` によりそのClaudeは何も実行できません。
 

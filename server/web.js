@@ -35,6 +35,7 @@ const { tmuxNotify } = await import('../lib/notify.js');
 const { warn, warner, recentWarnings } = await import('../lib/log.js');
 const { freeBytes, hasRoom, humanBytes, MIN_FREE_BYTES } = await import('../lib/disk.js');
 const { staleMcp } = await import('../lib/stale-mcp.js');
+const { appVersion } = await import('../lib/version.js');
 const { receiveConnectRequests, listPending, readPending, dropPending, sendConnectRequest,
   readBlocked, blockDevice, unblockDevice } = await import('../lib/connect.js');
 const { matchInvite, markInviteUsed, inviteConflict, newLinkInvite } = await import('../lib/invite.js');
@@ -142,7 +143,7 @@ const server = createServer(async (req, res) => {
     // 自分のQR（署名付き・短命bundle）。相手にカメラでかざしてもらう。
     if (url.pathname === '/api/qr') {
       const prof = await readProfile();
-      // QRは軽さ優先＝画像は載せない（名前・絵文字のみ）。画像は招待リンク経由で伝わる。
+      // QRは軽さ優先＝画像は載せない（名前・絵文字のみ）。画像はつながったあとのプロフィールの手紙で伝わる。
       const b = signedBundle(await identity(), now(), 300, { name: prof.name || '', icon: prof.icon || '', invite_link: await newLinkInvite() });
       const dataUri = await QRCode.toDataURL(JSON.stringify(b), { margin: 1, width: 340,
         color: { dark: '#16202b', light: '#ffffff' } });
@@ -153,7 +154,9 @@ const server = createServer(async (req, res) => {
       const prof = await readProfile();
       // invite_link＝使い切りの合言葉。開いた側がこれを添えて申し込み返し、こちらの承認待ちに「あなたのリンクから」と並ぶ。
       // リンクと連絡経路は載せない（リンクは盗み見られうる。確認が済んでからプロフィールの手紙で届く）。
-      const b = signedBundle(await identity(), now(), 300, { name: prof.name || '', icon: prof.icon || '', avatar: prof.avatar || '', banner: prof.banner || '', invite_link: await newLinkInvite() });
+      // 画像も載せない（QRと同じ）。画像入りだとリンクが約3万字になり、LINE などで切れる。
+      // 画像は承認のあとに届くプロフィールの手紙で伝わる（承認時の pushProfile）。
+      const b = signedBundle(await identity(), now(), 600, { name: prof.name || '', icon: prof.icon || '', invite_link: await newLinkInvite() });
       const token = Buffer.from(JSON.stringify(b), 'utf8').toString('base64url');
       return json(res, 200, { token, expires_at: b.expires_at, device: b.device_id.slice(0, 8) });
     }
@@ -479,6 +482,14 @@ if (!(await hasRoom(SELF))) {
 // ラッパー経由などで二重に起動されても、片方は待機に回る（Y.K.報告 2026-10-22）。
 // 落ちると KeepAlive が再起動を繰り返すだけになる。
 await protectSecrets(SELF);   // 以前の版が 0644 で書いた鍵・トークンを本人だけに
+// 版が変わったら、プロフィールを一度だけ送り直す（相手の画面の「版」を新しくするため）。
+// プロフィールを一度も保存していない人は送らない（空のプロフィールで相手側の名前を消さないため）。
+{
+  const v = await appVersion(); const mark = join(SELF, 'profile-version-sent');
+  const sent = await readFile(mark, 'utf8').catch(() => '');
+  const hasProfile = await readFile(PROFILE, 'utf8').then(() => true, () => false);
+  if (v && hasProfile && v !== sent.trim()) { await writeFile(mark, v); pushProfile(); }
+}
 let standby = false;
 const listen = () => server.listen(PORT, process.env.MM_BIND || '127.0.0.1', () => console.log(`bump console:  http://localhost:${PORT}  (self=${SELF})`));
 server.on('error', (e) => {

@@ -43,7 +43,7 @@ import { tmuxNotify, osaNotify, chatworkNotify } from '../lib/notify.js';
 import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
 import { takeDaemonLock, ownsDaemonLock } from '../lib/single.js';
 import { relayUrls, editRelays } from '../lib/relays.js';
-import { handleConnectRequests } from '../lib/connect.js';
+import { handleConnectRequests, listPending } from '../lib/connect.js';
 import { t, tf } from '../lib/i18n.js';
 
 const __dir = dirname(fileURLToPath(import.meta.url));   // 専用パッケージに焼き込まれた物を読む用
@@ -338,6 +338,15 @@ async function cmdDaemon(flags) {
   // 新版の見張り（1日1回・通知だけ）。勝手に入れ替えない＝更新の実行は人がアプリを開いた時。
   // build.txt の版と GitHub の HEAD を見比べる。git が無い・オフラインなら黙って何もしない。
   let lastUpdateCheck = 0;
+  // 起動の1時間後に1回目、以後24時間ごと（更新で常駐が起こし直されても、思い出させが飛ばないように）。
+  let pendingRemindAt = Date.now() - 23 * 60 * 60 * 1000;
+  let knownPending = null;
+  // 申し込みの知らせ：macOS通知（または標準出力）と、設定していれば Chatwork。
+  const tellPending = async (msg) => {
+    if (flags.notify === 'osa') await osaNotify(msg).catch(() => {}); else out(msg);
+    const cfg = await readJson(join(root(), 'notify.json')).catch(() => null);
+    if (cfg && cfg.chatworkToken && cfg.chatworkRoom) await chatworkNotify(cfg.chatworkToken, cfg.chatworkRoom, msg, cfg.chatworkAccount).catch(() => {});
+  };
   const checkUpdate = async () => {
     if (Date.now() - lastUpdateCheck < 24 * 60 * 60 * 1000) return;
     lastUpdateCheck = Date.now();
@@ -345,14 +354,22 @@ async function cmdDaemon(flags) {
       const { execFile } = await import('node:child_process');
       const { promisify } = await import('node:util');
       const ex = promisify(execFile);
-      const stamp = await readFile(join(__dir, '..', 'build.txt'), 'utf8').catch(() => '');
+      const say = (msg) => (flags.notify === 'osa' ? osaNotify(msg) : Promise.resolve(out(msg))).catch(() => {});
+      const repo = join(__dir, '..');
+      const stamp = await readFile(join(repo, 'build.txt'), 'utf8').catch(() => '');
       const m = stamp.match(/\(([0-9a-f]{7,})\)/);
-      if (!m) return;                      // 版の刻印が無い＝リポ運用（git pullで更新する人）
       const { stdout } = await ex('git', ['ls-remote', 'https://github.com/daiokawa/bump.git', 'HEAD'], { timeout: 15000 });
-      const head = stdout.slice(0, 7);
-      if (head && !head.startsWith(m[1].slice(0, 7)) && !m[1].startsWith(head)) {
-        await osaNotify(t('bump update available — open the app to apply')).catch(() => {});
+      const remote = stdout.split(/\s/)[0];
+      if (!/^[0-9a-f]{40}$/.test(remote)) return;
+      if (m) {                             // アプリ組：版の刻印と GitHub の最新を比べる
+        const head = remote.slice(0, 7);
+        if (!head.startsWith(m[1].slice(0, 7)) && !m[1].startsWith(head)) await say(t('bump update available — open the app to apply'));
+        return;
       }
+      // git で使う人（clone 組）：GitHub の最新コミットが手元に無ければ遅れている。
+      // 手元が先に進んでいる（未push）だけなら、最新は手元にあるので知らせない。
+      const have = await ex('git', ['-C', repo, 'cat-file', '-e', `${remote}^{commit}`], { timeout: 5000 }).then(() => true, () => false);
+      if (!have) await say(t('bump update available — in the bump folder run: git pull && npm ci --omit=dev && bash up.sh'));
     } catch {}
   };
 
@@ -373,11 +390,28 @@ async function cmdDaemon(flags) {
     const reqs = [];
     if (relayDir) await pullAllFromRelay({ relayDir, myDeviceId: id.device_id, peersOf, onConnect: (b) => { reqs.push(b); } }).catch(() => {});
     if (reqs.length) {
-      const got = await handleConnectRequests(reqs, { myDeviceId: id.device_id, now }).catch(() => []);
-      for (const r of got) if (r.via_link) {
-        const msg = tf('[bump] {name} opened your invite link — approve them on screen to connect', { name: r.name || r.device_id.slice(0, 6) });
-        if (flags.notify === 'osa') await osaNotify(msg).catch(() => {}); else out(msg);
+      await handleConnectRequests(reqs, { myDeviceId: id.device_id, now }).catch(() => []);
+    }
+    // 申し込みは全部知らせる（以前は招待リンクから来た分だけで、ほかは画面を開くまで誰も気づかず
+    // 5件たまったことがある 2026-11-28）。取り込むのは画面のサーバーのこともあるので、
+    // 承認待ちの一覧そのものを見て、初めて見る申し込みを知らせる。本文（一言）は載せず、誰からかだけ。
+    {
+      const list = await listPending().catch(() => null);
+      if (list) {
+        for (const r of list) if (knownPending && !knownPending.has(r.device_id)) {
+          const name = r.name || r.device_id.slice(0, 6);
+          await tellPending(r.via_link
+            ? tf('[bump] {name} opened your invite link — approve them on screen to connect', { name })
+            : tf('[bump] Connection request from {name} — approve or decline on screen', { name }));
+        }
+        knownPending = new Set(list.map((r) => r.device_id));   // 初回は今ある分を既知にするだけ（残りは1日1回の知らせで）
       }
+    }
+    // 承認待ちが残っていれば1日1回思い出させる。
+    if (Date.now() - pendingRemindAt >= 24 * 60 * 60 * 1000) {
+      pendingRemindAt = Date.now();
+      const n = (await listPending().catch(() => [])).length;
+      if (n) await tellPending(tf('[bump] {n} connection request(s) waiting for approval', { n }));
     }
     for (const pairId of pairIds) {
       const peer = peers[pairId]; if (!peer) continue;

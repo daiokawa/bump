@@ -140,6 +140,11 @@ async function openProfile(pairId){
       if(/^https?:\/\//i.test(u)){const a=el('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=u;row.append(a);}else{const s=el('span');s.textContent=u;row.append(s);}lk.append(row);});
     body.append(lk);}
   else{const none=el('div','cropsub');none.style.marginTop='12px';none.textContent=t('No profile info yet.');body.append(none);}
+  // 相手が動かしている bump の版（プロフィールと一緒に届く。旧版の相手からは届かない）。
+  {const vr=el('div','cropsub');vr.style.marginTop='10px';
+    vr.textContent=!P.version?t('bump version: not reported (older version)')
+      :tf('bump version: {v} (as of {at})',{v:P.version,at:ts(P.version_at)})+(P.my_version&&P.version!==P.my_version?' — '+tf('yours is {v}',{v:P.my_version}):'');
+    body.append(vr);}
   panel.append(body);
   const acts=el('div','cropacts');acts.style.cssText='padding:6px 20px 18px';const close=el('button','btn');close.style.cssText='flex:1;background:#eef2f6;color:#46586a';close.textContent=t('Close');close.onclick=()=>scrim.remove();acts.append(close);panel.append(acts);
   scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);

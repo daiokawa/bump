@@ -33,7 +33,7 @@ const JADICT={
   'Open bump':'bumpを開く',
   'Invalid invite link.':'招待リンクが不正です。',
   'Could not read the invite link.':'招待リンクを読めませんでした。',
-  'This invite link has expired (5 minutes). Ask them to send a new one.':'この招待リンクは期限切れです（5分）。相手に新しいリンクを送ってもらってください。',
+  'This invite link has expired (10 minutes). Ask them to send a new one.':'この招待リンクは期限切れです（10分）。相手に新しいリンクを送ってもらってください。',
   'Could not verify the invite link.':'招待リンクの検証に失敗しました。',
   'Connected':'つながりました',
   'They are in your list as engaged. You can now exchange letters, asynchronously.':'相手をEngagedに追加しました。これで非同期にやり取りできます。',
@@ -52,14 +52,14 @@ function fail(msg){
   if(!m)return fail(t('Invalid invite link.'));
   let bundle;
   // atob は1バイト＝1文字で返すので、そのまま JSON にすると日本語の名前が化けて署名が合わない
-  // （DW 志方さんの切り分け 2026-10-30）。UTF-8 として読み直す。
+  // （テスターの方の切り分け 2026-10-30）。UTF-8 として読み直す。
   try{ const bin=atob(m[1].replace(/-/g,'+').replace(/_/g,'/')); bundle=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0)))); }catch(e){ return fail(t('Could not read the invite link.')); }
   // fragmentは履歴・スクショに残り得るので即消す（codexレビュー）
   try{ history.replaceState(null,'',location.pathname); }catch(e){}
   const r=await (await fetch('/api/scan',{method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({bundle,via:'link'})})).json();
   if(r.key_changed){ return fail(r.error); }   // 既存の縁と鍵が違う＝黙って繋ぎ直さない（文言はサーバ側で翻訳済み）
-  if(r.error){ return fail(r.error==='expired'?t('This invite link has expired (5 minutes). Ask them to send a new one.'):t('Could not verify the invite link.')); }
+  if(r.error){ return fail(r.error==='expired'?t('This invite link has expired (10 minutes). Ask them to send a new one.'):t('Could not verify the invite link.')); }
   const dev=(bundle.device_id||'').slice(0,2).toUpperCase();
   const ava=el('div','ava');ava.textContent=dev||'?';
   const h=el('h1');h.textContent=t('Connected');

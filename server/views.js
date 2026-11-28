@@ -2,6 +2,7 @@
 // 画面用JSONビュー（state/pair/inbox/letter/sent）。web.js から分離（2026-07-20 リファクタ③）。
 // HTTPやプロセスのことは知らない。web.js（ルータ）が呼ぶだけの純データモジュール。
 
+import { appVersion } from '../lib/version.js';
 import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { identityPath, pairPaths } from '../lib/paths.js';
@@ -185,6 +186,7 @@ export async function pairJson(id, opt = {}) {
     name: peer.name || '', alias: peer.alias || '', label: contactLabel(id, peer.name, peer.alias, peer.ai),
     avatar: peer.avatar || '', banner: peer.banner || '', links: peer.links || '', channels: sanitizeChannels(peer.channels),
     safety: sn.display, visible: !!peer.show_presence, online: reach.online, lastSeen: reach.lastSeen,
+    version: peer.app_version || '', version_at: peer.app_version_at || '', my_version: await appVersion(),
     total: all.length, hasMore,
     messages: list.map((m) => ({ id: m.id, mine: m.from === me.device_id, body: m.body,
       at: m.created_at, suspicious: sc[m.id] || null, reply: replyOf(m, all) })),
