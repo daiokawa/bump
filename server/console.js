@@ -12,6 +12,8 @@ function renderHowto(){
   [...$('nav').children].forEach(x=>x.classList.remove('active'));
   const M=$('main');M.textContent='';
   const w=el('div','howto');
+  // 戻り道（以前は説明を開くと、どこを押せば戻れるか分からなかった）
+  const back=el('button','backbtn');back.textContent='‹';back.title=t('Back to Inbox');back.setAttribute('aria-label',t('Back to Inbox'));back.style.marginBottom='10px';back.onclick=()=>setSection('inbox');w.append(back);
   const h=el('div','howto-hero');h.textContent=t('What bump can do');
   const lead=el('div','howto-lead');lead.textContent=t("Mail for AIs. It connects your local AI with someone else's — across brands, safely. Here is what you can do.");
   w.append(h,lead);
@@ -44,7 +46,7 @@ async function refreshBadge(fresh){
       const list=cache.inbox.filter(x=>x.unread!==false&&!x.triage);
       if(!list.length)return;
       const it=list[list.length-1];            // いちばん古い未読から
-      if(section!=='inbox'){setSection('inbox');setTimeout(()=>jumpTo(it),350);return;}
+      if(section!=='inbox'){section='inbox';sel=null;[...$('nav').children].forEach(x=>x.classList.toggle('active',x.dataset.s==='inbox'));loadList().then(()=>jumpTo(it));return;}
       jumpTo(it);
     };
     if(section==='inbox')renderList();
@@ -67,6 +69,9 @@ let lastWarnCount=0;
 async function refreshHealth(){
   let h=null;try{h=await (await fetch('/api/health')).json();}catch{return;}
   renderStale(h.stale_mcp);
+  // 空きが足りない時は受け取りを止めている。目立つ帯で知らせる（以前は画面に出なかった）。
+  {let bar=$('diskBar');if(h.disk&&h.disk.ok===false){if(!bar){bar=el('div');bar.id='diskBar';bar.style.cssText='background:var(--red);color:#fff;font-size:12.5px;font-weight:700;padding:8px 12px;border-radius:10px;margin:0 12px 10px';$('pendingBox').before(bar);}
+    bar.textContent=tf('Disk space is low ({free} left). Receiving letters is paused until you free up space.',{free:h.disk.freeText});}else if(bar)bar.remove();}
   const w=h.warnings||[];
   const b=$('warnBtn');
   if(!w.length){b.style.display='none';lastWarnCount=0;return;}
@@ -142,8 +147,11 @@ async function refreshPackages(){
       const box2=el('div','inqlog');
       const kv=(k,v)=>{const r=el('div','inqline');r.textContent=k+': '+v;box2.append(r);};
       kv(t('From'),m.from||t('Unknown')); kv(t('Received'),ts(m.at)); kv(t('Size'),Math.round((m.bytes||0)/1024)+'KB');
-      kv('sha256',m.sha256||''); kv(t('Stored at'),m.file||'');
+      kv(t('Fingerprint (sha256)'),m.sha256||''); kv(t('Stored at'),m.file||'');
       panel.append(box2);
+      // 置き場所はコピーできるように（手元のAIに「ここを見て」と渡すため）
+      if(m.file){const cp=el('button','btn decline');cp.style.cssText='margin-top:8px;padding:8px 13px;font-size:12.5px;min-width:0';cp.textContent=t('Copy the location');
+        cp.onclick=async()=>{try{await navigator.clipboard.writeText(m.file);toast(t('✓ Copied'));}catch(e){toast(e.message,'err');}};panel.append(cp);}
       if(m.notes){const nt=el('div','letter');nt.style.cssText='font-size:13px;margin-top:12px;max-height:220px;overflow:auto';nt.textContent=m.notes;panel.append(nt);}
       const warnv=el('div','cropsub');warnv.style.marginTop='12px';
       warnv.textContent=t('Before installing, ask the sender out of band (LINE, etc.) whether they really sent it. You can have your AI read the contents and inspect them.');
@@ -185,6 +193,8 @@ async function refreshPending(fresh){
     const no=el('button','pend-no');no.textContent=t('Decline');
     no.onclick=()=>rejectPending(p);
     btns.append(see,ok,no);row.append(btns);box.append(row);
+    // 行のどこを押しても中身を開く（ボタンは各自の動き）
+    row.style.cursor='pointer';row.onclick=(e)=>{if(!e.target.closest('button'))see.onclick();};
   });
 }
 // 断る：今回だけ／ブロックも、を1つの小窓で選ぶ（console-ui.js の declineRequest）。
@@ -197,7 +207,7 @@ function renderList(){
     cache.inbox.forEach(it=>{
       const isUnread=it.unread!==false && !it.triage; // 未読＝未開封かつ未処理
       const row=el('div','row'+(isUnread?' unread':'')+(sel&&sel.id===it.id?' sel':''));row.onclick=()=>{sel={type:'inbox',...it};renderList();renderMain();};
-      const av=avaInto(el('div','ava'),{avatar:it.avatar,icon:it.icon,text:nm(it.pair).slice(0,2).toUpperCase()});av.style.background=color(it.pair);
+      const av=avaInto(el('div','ava'),{avatar:it.avatar,icon:it.icon,text:ini(it.label,it.pair)});av.style.background=color(it.pair);
       const g=el('div','grow');const r1=el('div','r1');const n=el('div','nm'+(isUnread?' unread':''));n.textContent=it.label||nm(it.pair);const tm=el('div','time');tm.textContent=ts(it.at);r1.append(n,tm);
       const stat=it.triage==='applied'?t('✓ Handed'):(it.triage==='declined'?t('✕ Declined'):(it.unread!==false?t('New message'):t('Opened')));
       const r2=el('div','r2');const s=el('span');s.textContent=stat;r2.append(s);if(it.suspicious){const w=el('span','warn');w.textContent='⚠';r2.append(w);}
@@ -208,7 +218,7 @@ function renderList(){
     if(!cache.pairs.length)return listEmpty(t('Connect with "Add contact".'));
     cache.pairs.forEach(p=>{
       const row=el('div','row'+(sel&&sel.pair===p.id&&sel.type==='pair'?' sel':''));row.onclick=()=>{sel={type:'pair',pair:p.id};renderList();renderMain();};
-      const av=avaInto(el('div','ava'),{avatar:p.avatar,icon:p.icon,text:nm(p.id).slice(0,2).toUpperCase()});av.style.background=color(p.id);
+      const av=avaInto(el('div','ava'),{avatar:p.avatar,icon:p.icon,text:ini(p.label,p.id)});av.style.background=color(p.id);
       const rc=el('span','reach'+(p.online?' on':''));av.append(rc);
       const g=el('div','grow');const r1=el('div','r1');const n=el('div','nm'+(p.unread?' unread':''));n.textContent=p.label||nm(p.id);const tm=el('div','time');tm.textContent=ts(p.lastActivity);r1.append(n,tm);
       // 連絡先に載っている＝engaged なので、状態のラベルは出さない（到達可否だけ）。
@@ -221,9 +231,9 @@ function renderList(){
     const label={sent:t('Unread'),read:t('✓ Read'),declined:t('✕ Was declined'),unsent:t('↩ Recalled')};
     cache.sent.forEach(m=>{
       const row=el('div','row'+(sel&&sel.id===m.id&&sel.type==='sent'?' sel':''));row.onclick=()=>{sel={type:'sent',...m};renderList();renderMain();};
-      const av=avaInto(el('div','ava'),{avatar:m.avatar,icon:m.icon,text:nm(m.pair).slice(0,2).toUpperCase()});av.style.background=color(m.pair);
-      const g=el('div','grow');const r1=el('div','r1');const n=el('div','nm');n.textContent=(m.body||'').replace(/^【[^】]*】/,'').slice(0,20)||t('(empty)');const tm=el('div','time');tm.textContent=ts(m.at);r1.append(n,tm);
-      const r2=el('div','r2');const s=el('span');s.textContent=tf('To {name}',{name:m.label||nm(m.pair)});r2.append(s);g.append(r1,r2);
+      const av=avaInto(el('div','ava'),{avatar:m.avatar,icon:m.icon,text:ini(m.label||m.to,m.pair)});av.style.background=color(m.pair);
+      const g=el('div','grow');const r1=el('div','r1');const n=el('div','nm');n.textContent=tf('To {name}',{name:m.label||nm(m.pair)});const tm=el('div','time');tm.textContent=ts(m.at);r1.append(n,tm);
+      const r2=el('div','r2');const s=el('span');s.style.cssText='overflow:hidden;text-overflow:ellipsis';s.textContent=(m.body||'').replace(/^【[^】]*】/,'').split('\n').map(x=>x.trim()).find(Boolean)||t('(empty)');r2.append(s);g.append(r1,r2);
       const stt=el('div','st '+m.status);stt.textContent=label[m.status]||m.status;row.append(av,g,stt);L.append(row);
     });
   }
@@ -314,7 +324,7 @@ async function renderMain(){
   if(sel.type==='inbox'){
     const L=await (await fetch('/api/letter?pair='+encodeURIComponent(sel.pair)+'&id='+encodeURIComponent(sel.id))).json();
     M.textContent='';
-    const av=avaInto(el('div','m-ava'),{avatar:sel.avatar,icon:sel.icon,text:nm(sel.pair).slice(0,2).toUpperCase()});av.style.background=color(sel.pair);
+    const av=avaInto(el('div','m-ava'),{avatar:sel.avatar,icon:sel.icon,text:ini(sel.label,sel.pair)});av.style.background=color(sel.pair);
     const iStat=sel.triage==='applied'?t('✓ Handed'):(sel.triage==='declined'?t('✕ Declined'):(sel.unread!==false?t('Unhandled'):t('Opened')));
     const iCls=sel.triage==='applied'?'ok':(sel.triage==='declined'?'no':'');
     M.append(mHead(av,(L.label||nm(sel.pair)),ts(L.at),iStat,iCls,()=>openProfile(sel.pair)));
@@ -345,8 +355,10 @@ async function renderMain(){
     M.append(body);
     refreshBadge(); // 開いた＝既読になったのでバッジ/一覧を即更新
     const acts=el('div','m-actions');
-    const ap=el('button','btn apply');ap.textContent=t('Hand to my AI');ap.onclick=()=>openTabs(sel.pair,sel.id);
-    const dc=el('button','btn decline');dc.textContent=t('Not this one');dc.onclick=()=>openDecline(sel.pair,sel.id);
+    // 済んだ手紙では、同じ強さでボタンを並べない（もう一度渡すことはできる）。
+    const done=sel.triage==='applied'||sel.triage==='declined';
+    const ap=el('button','btn '+(done?'decline':'apply'));ap.textContent=done&&sel.triage==='applied'?t('Hand to another AI too'):t('Hand to my AI');ap.onclick=()=>openTabs(sel.pair,sel.id);
+    const dc=el('button','btn decline');dc.textContent=t('Not this one');dc.onclick=()=>openDecline(sel.pair,sel.id);if(done)dc.style.display='none';
     const vf=el('button','btn verify');vf.textContent=t('Ask the sender out of band');vf.onclick=()=>openVerify(sel.pair,sel.id,L);
     acts.append(ap,dc,vf);M.append(acts);
   }else if(sel.type==='pair'){
@@ -354,7 +366,7 @@ async function renderMain(){
     M.textContent='';
     const p=cache.pairs.find(x=>x.id===sel.pair)||{};
     if(imgOk(p.banner)){const bn=el('div','detail-banner');const im=el('img');im.src=p.banner;bn.append(im);M.append(bn);}
-    const av=avaInto(el('div','m-ava'),{avatar:p.avatar,icon:p.icon,text:nm(sel.pair).slice(0,2).toUpperCase()});av.style.background=color(sel.pair);
+    const av=avaInto(el('div','m-ava'),{avatar:p.avatar,icon:p.icon,text:ini(p.label,sel.pair)});av.style.background=color(sel.pair);
     M.append(mHead(av,(p.label||nm(sel.pair)),(P.online?t('Reachable'):t('Away')),undefined,undefined,()=>openProfile(sel.pair)));
     const body=el('div','m-body');{const aw=typeof awaitingCard==='function'?awaitingCard(P,sel.pair):null;if(aw)body.append(aw);}
     // やり取り履歴（日付ごと・10件ずつ・最新ページから遡る）＝voice-code版と同じ見せ方。
@@ -380,10 +392,18 @@ async function renderMain(){
         });
         older.disabled=bounds().start===0;newer.disabled=page===0;
         older.style.opacity=older.disabled?'.4':'1';newer.style.opacity=newer.disabled?'.4':'1';
+        // 今どこを見ているか（古い方から数えた番号）。ページを替えたら一覧の先頭へ戻す。
+        const {start:s0,end:e0}=bounds();pos.textContent=tf('{a}–{b} of {n}',{a:s0+1,b:e0,n:msgsAll.length});
+        ch.scrollIntoView({block:'nearest'});
       }
+      const pos=el('span');pos.style.cssText='align-self:center;font-size:12px;color:var(--muted);margin-left:4px';
       older.onclick=()=>{if(bounds().start>0){page++;renderPage();}};
       newer.onclick=()=>{if(page>0){page--;renderPage();}};
-      renderPage();nav.append(older,newer);ch.append(nav);body.append(ch);
+      nav.append(older,newer,pos);renderPage();ch.append(nav);body.append(ch);
+    }else{
+      // つながったばかりで、まだ何も無い時も白紙にしない
+      const e=el('div','card2');const eh=el('h4');eh.textContent=t('No letters yet');const ed=el('div');ed.style.cssText='font-size:12.5px;color:var(--muted);line-height:1.8';
+      ed.textContent=t('Letters between you will show here. Ask your AI to write to them, or wait for theirs.');e.append(eh,ed);body.append(e);
     }
     // 相手のプロフィールリンク（署名つきで届いたもの）。安全のため http(s) のみクリック可、他は素のテキスト。
     if((P.links||'').trim()){
@@ -402,7 +422,7 @@ async function renderMain(){
     M.querySelector('.m-head').append(gear);
   }else{
     M.textContent='';const label={sent:t('Unread'),read:t('✓ Read'),declined:t('✕ Was declined'),unsent:t('↩ Recalled')};
-    const av=avaInto(el('div','m-ava'),{avatar:sel.avatar,icon:sel.icon,text:nm(sel.pair).slice(0,2).toUpperCase()});av.style.background=color(sel.pair);
+    const av=avaInto(el('div','m-ava'),{avatar:sel.avatar,icon:sel.icon,text:ini(sel.label,sel.pair)});av.style.background=color(sel.pair);
     M.append(mHead(av,tf('To {name}',{name:sel.label||nm(sel.pair)}),ts(sel.at)+' · '+(label[sel.status]||sel.status),undefined,undefined,()=>openProfile(sel.pair)));
     const body=el('div','m-body');const srl=replyLine(sel.reply);if(srl)body.append(srl);const p=el('div','letter');p.textContent=(sel.body||'').replace(/^【[^】]*】/,'');body.append(p);
     if(sel.status==='declined'&&sel.reason){const r=el('div','inqlog');const line=el('div','inqline');line.textContent=tf('From them: {reason}',{reason:sel.reason});r.append(line);body.append(r);}

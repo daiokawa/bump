@@ -71,7 +71,17 @@ $('add').onclick=()=>{$('connScrim').classList.add('on');showPaste(false);qrLoad
 $('reInvite').onclick=()=>makeInvite();
 $('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('inviteLink').value);}catch(e){$('inviteLink').select();document.execCommand('copy');}toast(t('✓ Copied'));};
 $('toggleQR').onclick=async()=>{const s=$('qrSection');const showing=s.style.display!=='none';s.style.display=showing?'none':'block';$('toggleQR').textContent=showing?t('Connect in person with QR ▾'):t('Connect in person with QR ▴');
-  if(!showing&&!qrLoaded){try{const d=await (await fetch('/api/qr')).json();$('qrImg').src=d.dataUri;qrLoaded=true;$('qrExp').textContent=t('They scan it with their camera — recorded as confirmed in person.');}catch(e){$('qrExp').textContent=tf('Could not make a link: {msg}',{msg:e.message});}}};
+  if(!showing&&!qrLoaded)loadQR();};
+// QR も期限つき（5分）。残り時間を出し、切れたら作り直せるようにする（切れたまま見せ続けていた）。
+let qrTimer=null;
+async function loadQR(){clearInterval(qrTimer);$('qrImg').style.opacity='.25';
+  try{const d=await (await fetch('/api/qr')).json();$('qrImg').src=d.dataUri;$('qrImg').style.opacity='1';qrLoaded=true;
+    const tick=()=>{const s=Math.max(0,Math.round((Date.parse(d.expires_at)-Date.now())/1000));const ex=$('qrExp');ex.textContent='';
+      if(s>0){ex.textContent=tf('They scan it with their camera — recorded as confirmed in person. Valid for {m}:{s}.',{m:Math.floor(s/60),s:String(s%60).padStart(2,'0')});return;}
+      clearInterval(qrTimer);$('qrImg').style.opacity='.25';ex.textContent=t('This QR code has expired.')+' ';
+      const b=el('button','link');b.textContent=t('Make a new QR code');b.onclick=()=>loadQR();ex.append(b);};
+    tick();qrTimer=setInterval(tick,1000);}
+  catch(e){$('qrExp').textContent=tf('Could not make a link: {msg}',{msg:e.message});}}
 // 受け取ったリンクを貼る：小窓の中で切り替える（← 戻る で招待リンクの画面へ）。
 function showPaste(on){$('connMain').style.display=on?'none':'';$('pasteBox').style.display=on?'':'none';if(on){$('pasteIn').value='';$('pasteIn').focus();}}
 $('pasteLink').onclick=()=>showPaste(true);
@@ -83,5 +93,5 @@ $('pasteGo').onclick=async()=>{const raw=$('pasteIn').value.trim();if(!raw){toas
   catch(e){toast(tf('Could not connect: {error}',{error:e.message}),'err');}
   b.disabled=false;};
 
-function closeAll(){document.querySelectorAll('.scrim').forEach(s=>s.classList.remove('on'));clearInterval(invTimer);}
+function closeAll(){document.querySelectorAll('.scrim').forEach(s=>s.classList.remove('on'));clearInterval(invTimer);clearInterval(qrTimer);}
 document.querySelectorAll('.scrim').forEach(s=>s.addEventListener('click',e=>{if(e.target===s)closeAll();}));

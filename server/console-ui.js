@@ -49,6 +49,21 @@ Object.assign(I18N_JA, {
   'These Claude sessions connected to bump before {when}, so their bump tools are an old version. In each tab, reconnect bump from /mcp (or restart Claude). After one reconnect, later updates apply without it.': '次のタブの Claude は {when} より前に bump とつながったので、bump の道具が古い版のままです。各タブで /mcp から bump をつなぎ直してください（Claude を開き直しても構いません）。一度つなぎ直せば、そのあとの更新は自動で効きます。',
   '{tab} tab — connected {when}': '{tab} タブ（{when} からつながっている）',
   'Which AI should read this?': 'どのAIに読ませますか？',
+  'Safety number': '安全番号（読み合わせ用）',
+  'Back to Inbox': '着信へ戻る',
+  '{a}–{b} of {n}': '{n}件中 {a}〜{b}件目',
+  'No letters yet': 'まだ手紙のやり取りはありません',
+  'Letters between you will show here. Ask your AI to write to them, or wait for theirs.': 'やり取りした手紙がここに並びます。手元のAIに手紙を頼むか、相手からの手紙を待ってください。',
+  'Could not open it: {msg}': '開けませんでした：{msg}',
+  'Hand to another AI too': '別のAIにも読ませる',
+  'That file is not an image.': '画像のファイルではありません。',
+  'The room ID is the number in the chat URL (digits only).': 'ルームIDは、チャットのURLにある数字です（数字だけ）。',
+  'They scan it with their camera — recorded as confirmed in person. Valid for {m}:{s}.': '相手がカメラで読み取ります（対面で確かめたと記録されます）。残り {m}:{s}。',
+  'This QR code has expired.': 'このQRコードは期限が切れました。',
+  'Make a new QR code': '新しいQRコードを作る',
+  'Fingerprint (sha256)': '指紋（sha256）',
+  'Copy the location': '置き場所をコピー',
+  'Disk space is low ({free} left). Receiving letters is paused until you free up space.': 'ディスクの空きが足りません（残り {free}）。空きを作るまで、手紙の受け取りを止めています。',
   'Show': '表示',
   'Hide': '隠す',
 });
@@ -155,4 +170,12 @@ async function declineRequest(deviceId, name, onDone) {
 document.addEventListener('DOMContentLoaded', () => {
   const tok = $('cwToken'), b = $('cwShow'); if (!tok || !b) return;
   b.onclick = () => { const show = tok.type === 'password'; tok.type = show ? 'text' : 'password'; b.textContent = t(show ? 'Hide' : 'Show'); };
+});
+
+// 自分の端末番号をコピー（相手に読み上げる・送るとき用）。ルームIDは数字だけ（違えば保存の前に知らせる）。
+document.addEventListener('DOMContentLoaded', () => {
+  const c = $('meFpCopy');
+  if (c) c.onclick = async () => { try { await navigator.clipboard.writeText($('meFp').textContent.replace(/\s+/g, '')); toast(t('✓ Copied')); } catch (e) { toast(e.message, 'err'); } };
+  const room = $('cwRoom');
+  if (room) room.addEventListener('change', () => { if (room.value && /\D/.test(room.value.trim())) toast(t('The room ID is the number in the chat URL (digits only).'), 'err'); });
 });

@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="i18n-pending">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>bump</title>
+<style>html.i18n-pending body{visibility:hidden}</style>
 <link rel="icon" href="/assets/icon-32.png">
 <link rel="apple-touch-icon" href="/assets/icon-180.png">
 <style>
@@ -94,6 +95,9 @@
   .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#16202b;color:#fff;font-size:13.5px;font-weight:600;padding:11px 18px;border-radius:11px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:300;max-width:min(560px,90vw)}
   .toast.err{background:var(--red)}
   .dialog,.croppanel{position:relative}
+  .m-actions,.cropacts,.quickrow,.pend-btns{flex-wrap:wrap}
+  @media (max-width:760px){.side{min-width:220px!important;width:220px!important}.m-head,.m-body,.m-actions{padding-left:16px;padding-right:16px}}
+  .secthd{font-size:12px;font-weight:800;color:#46586a;border-bottom:1px solid var(--line);padding-bottom:6px;margin:4px 0 10px}
   .xclose{position:sticky;top:0;float:right;margin:-8px -8px 0 8px;border:0;background:#eef2f6;color:#46586a;border-radius:9px;width:32px;height:32px;font-size:19px;line-height:1;cursor:pointer;z-index:2}
   .xclose:hover{background:#e2e8ef}
   .btn.apply{background:var(--blue);color:#fff}
@@ -189,7 +193,7 @@
   .pend-btns{display:flex;gap:6px;margin-top:8px}
   .pend-see{border:0;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:700;background:#fff;color:#3c5670;box-shadow:inset 0 0 0 1px #c8d6e5;cursor:pointer;flex:1}
   .pend-see:hover{background:#f4f7fa}
-  .pend-ok{border:0;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;background:#173a5e;color:#fff;cursor:pointer;flex-shrink:0}
+  .pend-ok{border:0;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;background:var(--blue);color:#fff;cursor:pointer;flex-shrink:0}
   .pend-no{border:0;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;background:#e2e8ef;color:#46586a;cursor:pointer;flex-shrink:0}
   /* 連絡経路（設定）＋別経路照会パネル・照会ログ */
   .chrow{margin-bottom:7px}
@@ -236,10 +240,11 @@
 
   <div class="scrim" id="setScrim"><div class="dialog">
     <h3 class="dh" data-ja="プロフィール">Profile</h3><div class="dsub" data-ja="名前・アイコンは、つながる相手に伝わります（署名つき）。">Your name and icon are shared, signed, with the people you connect to.</div>
+    <div class="secthd" data-ja="相手に見えるもの">Shown to the people you connect with</div>
     <div class="ilabel" data-ja="名前">Name</div><input class="setin" id="pName" placeholder="e.g. Alex Smith" data-ja-placeholder="例: 山田花子">
-    <div class="ilabel" style="margin-top:13px" data-ja="あなたの device 番号（鍵の指紋）">Your device number (key fingerprint)</div>
+    <div class="ilabel" style="margin-top:13px" data-ja="あなたの端末番号（鍵の指紋）">Your device number (key fingerprint)</div>
     <div class="exp" style="margin:0 0 8px" data-ja="相手が承認の前に本人確認で聞いてくることがあります。そのときは電話やLINEでこの番号を読み上げてください。秘密ではないので伝えて構いません。">Before approving you, the other person may ask for this number to confirm it is you. Read it out over the phone or a chat app. It is not a secret.</div>
-    <div class="fp" id="meFp"></div>
+    <div class="irow" style="align-items:center"><div class="fp" id="meFp" style="flex:1"></div><button type="button" class="btn decline" id="meFpCopy" style="min-width:0;padding:9px 13px;font-size:12.5px" data-ja="コピー">Copy</button></div>
     <div class="ilabel" style="margin-top:13px" data-ja="プロフィール画像（バナー＋アイコン）">Profile images (banner + icon)</div>
     <div class="xprof">
       <div id="bnDrop" class="bndrop"><img id="bnImg" alt=""><div id="bnPh" class="bnph" data-ja="タイトルバナー（横長）をドロップ／クリック">Drop or click to set a banner (wide)</div><button type="button" id="bnClear" class="imgclear">×</button></div>
@@ -253,6 +258,7 @@
     <div class="ilabel" style="margin-top:15px" data-ja="連絡経路（本人確認で相手が開くツール）">Contact channels (what the other person opens to verify you)</div>
     <div class="exp" style="margin:0 0 9px" data-ja="相手があなたを別経路で本人確認するとき、ここで選んだツールが相手の画面で開きます。使うものにチェックを入れて、リンク／IDを入れてください。">When someone verifies you over another channel, the tools you pick here open on their screen. Check the ones you use and add a link or ID.</div>
     <div id="chList"></div>
+    <div class="secthd" style="margin-top:22px" data-ja="このMacの中だけ（相手には伝わりません）">Only on this Mac (never shared)</div>
     <div class="ilabel" style="margin-top:15px" data-ja="新着通知をChatworkにも送る（任意）">Also send new-arrival alerts to Chatwork (optional)</div>
     <div class="exp" style="margin:0 0 9px" data-ja="新着があったとき「誰から何件」だけをChatworkに送ります（本文は送りません）。トークンはこのMacにだけ保存され、相手には伝わりません。マイチャット宛にすればスマホにプッシュが届きます。">When something arrives, only "who and how many" goes to Chatwork — never the letter itself. The token stays on this Mac and is never shared. Point it at My Chat and your phone gets a push.</div>
     <div class="irow"><input class="setin" id="cwToken" type="password" placeholder="Chatwork API token" data-ja-placeholder="Chatwork APIトークン" autocomplete="off" spellcheck="false"><button type="button" class="btn decline" id="cwShow" style="min-width:0;padding:11px 14px" data-ja="表示">Show</button></div>

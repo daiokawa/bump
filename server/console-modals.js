@@ -25,7 +25,7 @@ function openPairSettings(pairId,P){
   const kv=(k,v)=>{const r=el('div','kv');const kk=el('div','k');kk.textContent=k;const vv=el('div','v');vv.textContent=v;r.append(kk,vv);return r;};
   c1.append(kv(t('Authority'),t('Zero (no tool execution, no shell, no file access)')));
   c1.append(kv(t('How confirmed'),confirmLabel(P.confirmed)));
-  const snl=el('div','kv');const snk=el('div','k');snk.textContent='safety number';const snv=el('div','sn');snv.textContent=P.safety;snl.append(snk,snv);c1.append(snl);panel.append(c1);
+  const snl=el('div','kv');const snk=el('div','k');snk.textContent=t('Safety number');const snv=el('div','sn');snv.textContent=P.safety;snl.append(snk,snv);c1.append(snl);panel.append(c1);
   // オンライン開示
   const c2=el('div','card2');const r=el('div','swrow');const box=el('div');const t3=el('div');t3.style.cssText='font-size:13px;font-weight:700';t3.textContent=t('Show this person when you are online');const d=el('div');d.style.cssText='font-size:11.5px;color:var(--muted);margin-top:2px';d.textContent=t('Off (default): they cannot tell whether you are online.');box.append(t3,d);
   const sw=el('div','sw'+(P.visible?' on':''));sw.append(el('i'));
@@ -127,7 +127,7 @@ async function openProfile(pairId){
   if(imgOk(P.banner)){const bn=el('div','detail-banner');const im=el('img');im.src=P.banner;bn.append(im);panel.append(bn);}
   const body=el('div');body.style.cssText='padding:18px 20px 6px';
   const head=el('div');head.style.cssText='display:flex;align-items:center;gap:12px';
-  const av=avaInto(el('div','m-ava'),{avatar:P.avatar,icon:P.icon,text:nm(pairId).slice(0,2).toUpperCase()});av.style.background=color(pairId);
+  const av=avaInto(el('div','m-ava'),{avatar:P.avatar,icon:P.icon,text:ini(P.label,pairId)});av.style.background=color(pairId);
   const nmv=el('div');nmv.style.cssText='font-size:17px;font-weight:800;color:var(--ink)';nmv.textContent=P.label||nm(pairId);
   head.append(av,nmv);body.append(head);
   if((P.links||'').trim()){const lk=el('div','inqlog');
@@ -188,7 +188,7 @@ function openCropper(src,tw,th,cb){
   const img=new Image();
   img.onload=()=>{
     const iw=img.naturalWidth,ih=img.naturalHeight;
-    const VW=(tw>=th)?460:280, VH=Math.round(VW*th/tw);   // 表示ビュー（切り出し比率と同じ）
+    const VW=Math.min((tw>=th)?460:280, window.innerWidth-80), VH=Math.round(VW*th/tw);   // 表示ビュー（切り出し比率と同じ・狭い画面では縮める）
     const base=Math.max(VW/iw,VH/ih);                      // 1倍＝ちょうど覆う
     let zoom=1,scale=base,ox=(VW-iw*scale)/2,oy=(VH-ih*scale)/2;
     const scrim=el('div','cropscrim'),panel=el('div','croppanel');
@@ -221,7 +221,7 @@ function openCropper(src,tw,th,cb){
   };
   img.src=src;
 }
-function pickImage(file,tw,th,cb){if(!file||!/^image\//.test(file.type))return;const r=new FileReader();r.onload=()=>openCropper(r.result,tw,th,cb);r.readAsDataURL(file);}
+function pickImage(file,tw,th,cb){if(!file||!/^image\//.test(file.type)){if(file)toast(t('That file is not an image.'),'err');return;}if(!file||!/^image\//.test(file.type))return;const r=new FileReader();r.onload=()=>openCropper(r.result,tw,th,cb);r.readAsDataURL(file);}
 
 function renderInqLines(container,list){(list||[]).forEach(iq=>{const line=el('div','inqline');const t8=el('span');t8.textContent=tf('Checked out of band: {ch} · {time}',{ch:iq.ch||'',time:ts(iq.at)});line.append(t8);if(iq.note){const n=el('span','inqnote');n.textContent=tf(' ({note})',{note:iq.note});line.append(n);}container.append(line);});}
 // 別経路で本人に連絡（照会）パネル。開くのは相手が宣言した経路。行為のみ記録。
@@ -242,8 +242,10 @@ function openVerify(pair,id,L){
   const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.maxWidth='460px';panel.style.width='min(460px,calc(100vw - 40px))';
   const hd=el('div','crophd');hd.textContent=t('Ask the sender what they meant');const sub=el('div','cropsub');sub.textContent=t('Reach the sender directly, out of band.');panel.append(hd,sub);
   if(L.channels&&L.channels.length){const wrap=el('div','chbtns');L.channels.forEach(c=>{const btn=el('button','chbtn');btn.textContent=c.label||c.key;
-    btn.onclick=async()=>{const u=chUrl(c.key,c.value);if(u)await fetch('/api/open',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url:u})});
-      const r=await (await fetch('/api/inquire',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pair,id,ch:c.label||c.key})})).json();L.inquiries=r.inquiries;renderLog();};wrap.append(btn);});panel.append(wrap);}
+    // 開けた時だけ「照会した」と記録する（開けなかったのに記録が残っていた）。
+    btn.onclick=async()=>{const u=chUrl(c.key,c.value);
+      if(u){try{await postJson('/api/open',{url:u});}catch(e){toast(tf('Could not open it: {msg}',{msg:e.message}),'err');return;}}
+      try{const r=await postJson('/api/inquire',{pair,id,ch:c.label||c.key});L.inquiries=r.inquiries;renderLog();}catch(e){toast(e.message,'err');}};wrap.append(btn);});panel.append(wrap);}
   else{const none=el('div','cropsub');none.style.marginTop='6px';none.textContent=t('They have not registered any contact channels yet.');panel.append(none);}
   const logBox=el('div','inqlog');panel.append(logBox);function renderLog(){logBox.textContent='';renderInqLines(logBox,L.inquiries);}renderLog();
   const acts=el('div','cropacts');const close=el('button','btn');close.style.cssText='flex:1;background:#eef2f6;color:#46586a';close.textContent=t('Close');close.onclick=()=>{scrim.remove();renderMain();};acts.append(close);panel.append(acts);
