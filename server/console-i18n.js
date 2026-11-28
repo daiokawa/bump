@@ -297,7 +297,7 @@ const I18N_JA = {
  "receive": "受信",
  "read receipt ({pair})": "既読の通知({pair})",
  "Hand to your AI": "手元のAIに読ませる",
- "{n} session(s) running old code": "旧コードのままの席が {n} 本あります",
+ "{n} session(s) running old code": "守りの直しが入っていない席が {n} 本あります",
  "These MCP processes started before the last update was applied ({when}), so they are still running the old code — too old to even say so themselves. Restart those Claude sessions to load the new version.": "これらのMCPプロセスは最後の更新の適用（{when}）より前に起動しているため、まだ旧コードのまま動いています（古すぎて自分では名乗れない席です）。そのClaudeセッションを開き直すと新版が読み込まれます。",
  "PID {pid} — started {when}": "PID {pid} — {when} 起動",
  "↩ Recalled": "↩ 取り消し済み",

@@ -97,11 +97,11 @@ async function refreshHealth(){
 function renderStale(s){
   const b=$('staleBtn');
   if(!s||!s.stale||!s.stale.length){b.style.display='none';return;}
-  b.style.display='';b.textContent=tf('Old sessions: {n}',{n:s.stale.length});b.title=t('Claude sessions still running an old bump. Click for how to update them.');
+  b.style.display='';b.textContent=tf('Old sessions: {n}',{n:s.stale.length});b.title=t('Claude sessions still running bump from before a security fix. Click for how to update them.');
   b.onclick=()=>{
     const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.cssText='max-width:560px;width:min(560px,calc(100vw - 40px))';
     const hd=el('div','crophd');hd.textContent=tf('{n} session(s) running old code',{n:s.stale.length});
-    const sub=el('div','cropsub');sub.style.lineHeight='1.8';sub.textContent=tf('These Claude sessions connected to bump before {when}, so their bump tools are an old version. In each tab, reconnect bump from /mcp (or restart Claude). After one reconnect, later updates apply without it.',{when:ts(s.applied_at)});
+    const sub=el('div','cropsub');sub.style.lineHeight='1.8';sub.textContent=tf('These Claude sessions connected to bump before the security fix of {when}, so they still receive letters with the unfixed bump. In each tab, reconnect bump from /mcp (or restart Claude). After one reconnect, later updates apply without it.',{when:ts(s.applied_at)});
     panel.append(hd,sub);
     const box=el('div','inqlog');
     s.stale.forEach(x=>{const line=el('div','inqline');line.textContent=x.tab?tf('{tab} tab — connected {when}',{tab:x.tab,when:ts(x.started_at)}):tf('PID {pid} — started {when}',{pid:x.pid,when:ts(x.started_at)});box.append(line);});
