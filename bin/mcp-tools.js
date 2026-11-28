@@ -17,6 +17,7 @@ import { confirmedBy } from '../lib/pairing.js';
 import { listPending } from '../lib/connect.js';
 import { resolvePair } from '../lib/resolve.js';
 import { readdir } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 
 const RELAY = process.env.MM_RELAY || (process.env.BUMP_HOME
@@ -36,6 +37,11 @@ async function messagesOf(pairId) {
 function screenPath(pairId) { return join(pairPaths(pairId).base, 'screen.json'); }
 async function readScreen(pairId) { try { return await readJson(screenPath(pairId)); } catch { return {}; } }
 // 既読マーカー（手元Claudeがreadした置き手紙のid）。unread算出に使う。
+// この道具を呼んだ AI のタブ名（tmux のセッション名）。tmux の外なら空。
+function tabName() {
+  if (!process.env.TMUX) return Promise.resolve('');
+  return new Promise((res) => execFile('tmux', ['display-message', '-p', '#S'], { timeout: 3000 }, (e, out) => res(e ? '' : String(out).trim().slice(0, 80))));
+}
 function seenPath(pairId) { return join(pairPaths(pairId).base, 'mcp-seen.json'); }
 async function readSeen(pairId) { try { return new Set(await readJson(seenPath(pairId))); } catch { return new Set(); } }
 // 「読んだ」は3か所に分かれている（daemonのメモリ・画面の opened.json・MCPの mcp-seen.json）。
@@ -125,6 +131,17 @@ async function toolRead({ pair, limit = 10 }) {
       await pushToRelay({ pairId: pair, relayDir: RELAY, peerDeviceId: peer.device_id }).catch(() => {});
     }
     await writeJson(join(pairPaths(pair).base, 'opened.json'), [...opened, ...fresh.map((m) => m.id)]);
+  }
+  // AIに読ませた手紙は、画面の「まだ／済」でも済（読ませた）にする。どのタブが読んだかも残す
+  // （画面に「✓ jin に渡しました」と出る）。すでに済のもの（確認した・読ませなかった）は書き換えない。
+  const shown = msgs.slice(-limit).filter((m) => !CONTROL_TYPES.includes(m.type));
+  if (shown.length) {
+    const triPath = join(pairPaths(pair).base, 'triage.json'), handPath = join(pairPaths(pair).base, 'handed.json');
+    const tri = await readJson(triPath).catch(() => ({})), hand = await readJson(handPath).catch(() => ({}));
+    const tab = await tabName();
+    let n = 0;
+    for (const m of shown) if (!tri[m.id]) { tri[m.id] = 'applied'; if (tab) hand[m.id] = tab; n++; }
+    if (n) { await writeJson(triPath, tri); if (tab) await writeJson(handPath, hand); }
   }
   // in_reply_to＝何への返事か（こちらが送った手紙の冒頭1行）。probably は re の無い旧版からの推定。
   const recent = msgs.slice(-limit).map((m) => {

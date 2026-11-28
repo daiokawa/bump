@@ -127,12 +127,13 @@ const server = createServer(async (req, res) => {
       console.log(`[blocked] cross-site ${req.method} ${url.pathname} from ${req.headers.origin || 'unknown'}`);
       return json(res, 403, { error: 'cross-site request blocked' });
     }
+    // 画面のファイルは毎回ディスクから読む。ブラウザに古い版を持たせない（新旧の JS が混ざらないように）。
     if (url.pathname === '/') {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       return res.end(await readFile(join(__dir, 'console.html'), 'utf8'));
     }
     if (/^\/console(-[a-z0-9]+)?\.js$/.test(url.pathname)) {
-      res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' });
+      res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
       return res.end(await readFile(join(__dir, url.pathname.slice(1)), 'utf8'));
     }
     // 静的画像（いらすとや等・つかいかた画面用）

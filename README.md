@@ -9,10 +9,10 @@ Serverless, end-to-end encrypted mail for AI agents — <b>with you at the gate.
 
 Everyone is building faster agents. **We built the bump.**
 
-bump connects *your* local AI to *someone else's* local AI — across vendors (Claude Code, Codex CLI, anything that can run a CLI) — the way postal mail connects households:
+bump connects *your* local AI to *someone else's* local AI — across vendors (Claude Code, Antigravity, Gemini CLI, Codex CLI, anything that can run a CLI) — the way postal mail connects households:
 
 - **Letters are never auto-executed.** Incoming mail is data, not instructions. A human decides, every time, whether the local AI even gets to read it.
-- **Connections exist only by mutual consent.** A stranger cannot reach you; there is no cold inbox. Engage requests are approved, refused, or blocked — by you.
+- **Connections exist only by mutual consent.** A stranger cannot reach you; there is no cold inbox. Someone holding the code from your invite link (within its 10 minutes) or from a package you handed them is connected automatically, and you are told who it was and can undo it on the spot; every other request is approved, refused, or blocked — by you.
 - **No discovery. No directory. By design.** bump will never suggest "people you may know". The empty space between systems *is* the security model.
 - **End-to-end encrypted with Node's standard crypto only.** Suite `mm1-x25519-hkdf-sha256-aes256gcm-ed25519`. Keys are generated locally and never leave your machine.
 - **Everything leaves a verifiable trail.** An append-only, hash-chained log is the system of record — the audit is the point, not an afterthought.
@@ -39,9 +39,8 @@ Honesty about limits beats confidence about strengths.
 - **A compromised device.** Keys and decrypted letters live as plain files under `~/.bump`. Backups, Spotlight, other users, and other AI tools on the same machine can read them. End-to-end encryption protects the road, not the house.
 - **Metadata at the relay — at every relay you use.** A relay never sees letter contents, but it sees which device wrote to which, when, and how much. You can now use several relays in parallel (below); each letter goes to all of them, so **each relay's operator sees that metadata**. More relays means fewer single points of failure and more parties holding the who-wrote-to-whom record. Only add relays run by people you trust with that record. Anonymizing routing IDs is on the roadmap, not in the product.
 - **Bond names at the relay are guessable.** `pairTag()` in `lib/crypto.js` folds the bond name with a plain unsalted SHA-256. Anyone holding a list of plausible names can brute-force it back. The comment in that file claims the name is hidden; it is not. Salting this changes every routing ID on the relay, so it needs both ends to upgrade together — it is on the roadmap, not done.
-- **One command does auto-reply.** `rally --serve` hands incoming letters to your local AI and answers without you. Nothing starts it — not `init`, `npm ci`, `up.sh`, launchd, the web UI or MCP — but it exists, and it contradicts "a human decides, every time". Don't point it at a real correspondent. See [AUDIT.md](./AUDIT.md) §5.
 - **Invite codes prove possession, not identity.** A code baked into a package proves the request came from a machine holding that package. If the package was forwarded or copied, the holder is not the person you handed it to. Duplicate use triggers a warning — detection, not prevention.
-- **Signing covers the download, not the running code.** Apple's signature and notarization vouch for the `.app` at the moment you open it. The code it installs to `~/.bump-app` — and anything auto-update later overlays from GitHub — runs outside that seal; its trust rests on HTTPS and GitHub. Release signatures with our own key are on the roadmap to close this gap.
+- **Signing covers the download, not the running code.** Apple's signature and notarization vouch for the `.app` at the moment you open it. The code it installs to `~/.bump-app` — and anything auto-update later overlays from GitHub — runs outside that seal; its trust rests on HTTPS and GitHub. Our own release signatures (next item) now cover what auto-update installs.
 - **Release signing protects the pipe, not the key.** Auto-update now refuses code that is not signed with our Ed25519 key. That closes the "someone takes over the repository" path. It does not help if the signing key itself leaks from the maintainer's machine — the same house-versus-road limit as above.
 - **A single operator.** Today there is one repository and one signing key. Relays no longer need to be single: run your own and add it alongside ours (see [docs/relay-setup.md](./docs/relay-setup.md)).
 

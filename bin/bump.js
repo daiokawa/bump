@@ -15,7 +15,6 @@
 //   bump safety <pair>              safety numberを表示（帯域外で突合）
 //   bump verify <pair>              突合OKなら検証済みに固定
 //   bump send <pair> <text...>      署名・暗号化してoutboxへ
-//   bump deliver <pair> <inboxDir>  outbox→相手inboxへコピー（手動sync）
 //   bump receive <pair>             inboxを復号・検証してmessagesへ
 //   bump read <pair> [n]            受信メッセージを表示（外部データとして）
 //   bump log <pair> [--verify]      監査ログ表示／連鎖検証
@@ -23,7 +22,7 @@
 //
 // 1マシンに2エンドを立てる時は BUMP_HOME=~/.mm-a / ~/.mm-b で分ける。
 
-import { mkdir, readFile, writeFile, rename, copyFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { root, identityPath, pairPaths } from '../lib/paths.js';
@@ -38,7 +37,6 @@ import { engagePeer, pairSafetyNumber, pubkeysChanged, confirmedBy, markConfirme
 import { sendMessage, receiveInbox, CONTROL_TYPES, sendPackage } from '../lib/exchange.js';
 import { buildPackage, listPackages } from '../lib/package.js';
 import { pushToRelay, pullFromRelay, pullAllFromRelay } from '../lib/relay.js';
-import { callLocalAI } from '../lib/agent.js';
 import { tmuxNotify, osaNotify, chatworkNotify } from '../lib/notify.js';
 import { hasRoom, freeBytes, humanBytes } from '../lib/disk.js';
 import { takeDaemonLock, ownsDaemonLock } from '../lib/single.js';
@@ -270,20 +268,7 @@ async function cmdSend(pairId, textParts) {
   if (!body) die(t('Empty message body'));
   const { msg } = await sendMessage({ identity: id, peer, pairId, body, now });
   out(tf('Queued to outbox: {id}', { id: msg.id }));
-  out(tf('Deliver: `bump deliver {pair} <peer inbox>` / `bump sync {pair} <relayDir>`', { pair: pairId }));
-}
-
-async function cmdDeliver(pairId, destInbox) {
-  if (!destInbox) die(t('Peer inbox directory path required'));
-  const p = pairPaths(pairId);
-  await mkdir(destInbox, { recursive: true });
-  const files = await listBox(p.outbox, '.env.json');
-  let n = 0;
-  for (const f of files) {
-    await copyFile(join(p.outbox, f), join(destInbox, f));
-    n++;
-  }
-  out(tf('Delivered {n} envelope(s) to {dest}', { n, dest: destInbox }));
+  out(t('It goes out through the relay within about a minute (the watcher or the console sends it).'));
 }
 
 async function cmdReceive(pairId) {
@@ -292,34 +277,6 @@ async function cmdReceive(pairId) {
   const r = await receiveInbox({ identity: id, peer, pairId, now });
   out(tf('Received: {n} / duplicates: {skipped} / rejected: {rejected}', { n: r.received.length, skipped: r.skipped, rejected: r.rejected }));
   if (r.received.length) out(tf('Read them: `bump read {pair}`', { pair: pairId }));
-}
-
-// 到達通知（中身は出さない＝invariant「通知はよい・入力はしない」）。
-// 相手の新着置き手紙が届いたら「新着あり」とだけ知らせる。本文は read で人が明示的に。
-async function cmdWatch(pairId, relayDir, flags) {
-  const id = await loadIdentity();
-  const peer = await requirePeer(pairId);
-  const p = pairPaths(pairId);
-  const everyMs = Number(flags.every) || 5000;
-  const seen = new Set();
-  // 既存の相手メッセージは既知として初期化（"これから来る"分だけ通知）。
-  for (const f of await listBox(p.messages, '.msg.json')) {
-    try { const m = await readJson(join(p.messages, f)); if (m.from === peer.device_id) seen.add(m.id); } catch {}
-  }
-  out(tf('watch {pair}: waiting for new letters (every {ms}ms, Ctrl-C to stop)', { pair: pairId, ms: everyMs }));
-  for (;;) {
-    if (relayDir) await pullFromRelay({ pairId, relayDir, myDeviceId: id.device_id, peerDeviceId: peer && peer.device_id }).catch(() => {});
-    await receiveInbox({ identity: id, peer, pairId, now }).catch(() => {});
-    for (const f of await listBox(p.messages, '.msg.json')) {
-      let m; try { m = await readJson(join(p.messages, f)); } catch { continue; }
-      if (m.from === peer.device_id && !seen.has(m.id)) {
-        seen.add(m.id);
-        const hm = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-        out(tf('📬 {time} new letter on {pair} — `bump read {pair}` for the body (screened)', { time: hm, pair: pairId }));
-      }
-    }
-    await sleep(everyMs);
-  }
 }
 
 // 常駐 watcher（対称通知）。各手元端に1個。自分のrelayを見張り、
@@ -486,51 +443,6 @@ async function cmdSync(pairId, relayDir) {
   out(tf('sync: pushed {pushed} / pulled {pulled} / received {received} (rejected {rejected})', { pushed, pulled, received: r.received.length, rejected: r.rejected }));
 }
 
-// ラリー（gibbering）: 道具なし議論Claude同士の高速往復を relay 経由で回す。
-// テキストの往復だけ。tool実行なし＝invariant 7。着手が要る所で人間が入る。
-async function cmdRally(pairId, relayDir, flags) {
-  if (!relayDir) die(t('relay directory required'));
-  const id = await loadIdentity();
-  const peer = await requirePeer(pairId);
-  const persona = flags.persona || t('You are an AI debate partner. Reply sharply, technically, and briefly.');
-  const engine = flags.engine || 'claude';   // claude | codex（エンドの"頭"を差し替え）
-  const serve = !!flags.serve;               // 常駐応答: 届いたら答える、止まらない（報連相・依頼の受け手）
-  const max = serve ? Infinity : (Number(flags.max) || 6);
-  const idleMs = Number(flags.idle) || 2000;
-  const label = flags.label || id.device_id.slice(0, 6);
-  const replied = new Set();
-  let turns = 0, idlePolls = 0;
-  const maxIdle = serve ? Infinity : (Number(flags.maxidle) || 60);
-
-  if (flags.seed) {
-    await sendMessage({ identity: id, peer, pairId, body: flags.seed, now });
-    await pushToRelay({ pairId, relayDir, peerDeviceId: peer.device_id });
-    console.log(`[${label}] seed→ ${flags.seed}`);
-  }
-  while (turns < max && idlePolls < maxIdle) {
-    await pushToRelay({ pairId, relayDir, peerDeviceId: peer.device_id });
-    await pullFromRelay({ pairId, relayDir, myDeviceId: id.device_id, peerDeviceId: peer && peer.device_id });
-    const r = await receiveInbox({ identity: id, peer, pairId, now });
-    const fresh = r.received.filter((m) => !replied.has(m.id));
-    if (!fresh.length) { idlePolls++; await sleep(idleMs); continue; }
-    idlePolls = 0;
-    for (const m of fresh) {
-      replied.add(m.id);
-      console.log(`[${label}] ←recv ${m.body}`);
-      let reply;
-      try { reply = await callLocalAI({ engine, persona, body: m.body, idx: turns, mode: serve ? 'serve' : 'debate' }); }
-      catch (e) { console.log(`[${label}] AI error: ${e.message}`); reply = null; }
-      if (!reply) continue;
-      await sendMessage({ identity: id, peer, pairId, body: reply, now });
-      await pushToRelay({ pairId, relayDir, peerDeviceId: peer.device_id });
-      turns++;
-      console.log(`[${label}] send→ ${reply}`);
-      if (!serve && (/\[END\]/.test(reply) || turns >= max)) { console.log(tf('[{label}] rally finished', { label })); return; }
-    }
-  }
-  console.log(tf('[{label}] rally finished (turns={turns})', { label, turns }));
-}
-
 async function cmdRead(pairId, nStr) {
   await requirePeer(pairId);
   const p = pairPaths(pairId);
@@ -636,19 +548,16 @@ async function main() {
     case 'safety': return cmdSafety(await pair(rest[0]));
     case 'verify': return cmdVerify(await pair(rest[0]));
     case 'send': return cmdSend(await pair(rest[0]), rest.slice(1));
-    case 'deliver': return cmdDeliver(await pair(rest[0]), rest[1]);
     case 'sync': return cmdSync(await pair(rest[0]), rest[1]);
-    case 'watch': return cmdWatch(await pair(rest[0]), rest[1], flags);
     case 'daemon': return cmdDaemon(flags);
     case 'receive': return cmdReceive(await pair(rest[0]));
-    case 'rally': return cmdRally(rest[0], rest[1], flags);
     case 'read': return cmdRead(await pair(rest[0]), rest[1]);
     case 'log': return cmdLog(await pair(rest[0]), flags);
     case 'pairs': return cmdPairs();
     case 'relays': return cmdRelays(rest[0], rest[1]);
     default:
       out(t('bump — a trusted path between local AIs (a zero-permission mail exchange)'));
-      out('commands: init | id | device | version | invite | engage | request | safety | verify | send | package | packages | deliver | sync | watch | daemon | receive | rally | read | log | pairs | relays');
+      out('commands: init | id | device | version | invite | engage | request | safety | verify | send | package | packages | sync | daemon | receive | read | log | pairs | relays');
       if (cmd) process.exit(1);
   }
 }
