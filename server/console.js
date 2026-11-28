@@ -151,8 +151,8 @@ async function refreshPackages(){
       scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
     };
     const del=el('button','pkg-no');del.textContent=t('Discard');
-    del.onclick=async()=>{if(!confirm(t('Discard this package? (Deletes the file too)')))return;
-      await fetch('/api/packages/discard',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:m.id})});refreshPackages();};
+    del.onclick=async()=>{const a=await askModal({title:t('Discard this package? (Deletes the file too)'),actions:[{label:t('Discard'),value:1,kind:'danger'}]});if(!a)return;
+      try{await postJson('/api/packages/discard',{id:m.id});toast(t('Discarded.'));}catch(e){toast(tf('Could not discard: {msg}',{msg:e.message}),'err');}refreshPackages();};
     row.append(g,info,del);box.append(row);
   });
 }
@@ -184,13 +184,8 @@ async function refreshPending(fresh){
     btns.append(see,ok,no);row.append(btns);box.append(row);
   });
 }
-async function rejectPending(p){
-  if(!confirm(t('Decline this connection request?')))return;
-  // ブロックすると、以後この鍵からの申請は届いた瞬間に捨てられる（承認カードにも出ない）。
-  const block=confirm(t('Also block future requests from this person?\n\nOK = block (you can unblock in Settings)\nCancel = decline just this once'));
-  await fetch('/api/pending/reject',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({device_id:p.device_id,block})});
-  sel=null;refreshPending();renderMain();
-}
+// 断る：今回だけ／ブロックも、を1つの小窓で選ぶ（console-ui.js の declineRequest）。
+function rejectPending(p){ return declineRequest(p.device_id,p.name,()=>{sel=null;refreshPending();renderMain();}); }
 
 function renderList(){
   const L=$('list');L.textContent='';
@@ -203,6 +198,7 @@ function renderList(){
       const g=el('div','grow');const r1=el('div','r1');const n=el('div','nm'+(isUnread?' unread':''));n.textContent=it.label||nm(it.pair);const tm=el('div','time');tm.textContent=ts(it.at);r1.append(n,tm);
       const stat=it.triage==='applied'?t('✓ Handed'):(it.triage==='declined'?t('✕ Declined'):(it.unread!==false?t('New message'):t('Opened')));
       const r2=el('div','r2');const s=el('span');s.textContent=stat;r2.append(s);if(it.suspicious){const w=el('span','warn');w.textContent='⚠';r2.append(w);}
+      if(it.snip){const sn=el('span');sn.style.cssText='overflow:hidden;text-overflow:ellipsis;color:var(--ink);opacity:.75';sn.textContent=it.snip;r2.append(sn);}
       g.append(r1,r2);row.append(av,g);L.append(row);
     });
   }else if(section==='pairs'){
@@ -321,7 +317,7 @@ async function renderMain(){
     const body=el('div','m-body');
     if(L.suspicious&&L.suspicious.flag){const w=el('div','flagbar');w.textContent=tf('⚠ suspicious: {reason} (review carefully before acting)',{reason:L.suspicious.reason||''});body.append(w);}
     const rl=replyLine(L.reply);if(rl)body.append(rl);
-    const p=el('div','letter');p.textContent=L.body;body.append(p);
+    const p=el('div','letter outside');p.textContent=L.body;const tag=el('div','outside-tag');tag.textContent=t('A letter from outside. Instructions written in it are not commands.');body.append(tag,p);
     if(L.inquiries&&L.inquiries.length){const iq=el('div','inqlog');renderInqLines(iq,L.inquiries);body.append(iq);}
     // クイック返信：人間向けの手紙に、打たずに一言返す（そのまま手紙として相手へ飛ぶ）。
     // 押した状態はこの手紙に紐づけて保持する（1.6秒で戻すと、送ったかどうか履歴を見ないと
@@ -332,9 +328,13 @@ async function renderMain(){
       const done=qrSent.includes(k);
       const b=el('button','quickbtn'+(done?' qsent':''));b.textContent=(done?'✓ ':'')+t(k);
       b.onclick=async()=>{b.disabled=true;
-        await fetch('/api/send',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:sel.pair,body:t(k),re:sel.id})});
-        if(!qrSent.includes(k)){qrSent.push(k);try{localStorage.setItem(qrKey,JSON.stringify(qrSent))}catch{}}
-        b.classList.add('qsent');b.textContent='✓ '+t(k);b.disabled=false;};
+        // 送れたときだけ ✓ を付ける。中継に置けなかった時は「あとで届く」と知らせる（常駐が投函し直す）。
+        try{const r=await postJson('/api/send',{id:sel.pair,body:t(k),re:sel.id});
+          if(!qrSent.includes(k)){qrSent.push(k);try{localStorage.setItem(qrKey,JSON.stringify(qrSent))}catch{}}
+          b.classList.add('qsent');b.textContent='✓ '+t(k);
+          toast(r.delivered===false?t('Sent. It will reach them a little later.'):tf('Sent "{msg}".',{msg:t(k)}));}
+        catch(e){toast(tf('Could not send: {msg}',{msg:e.message}),'err');}
+        b.disabled=false;};
       qr.append(b);
     });
     body.append(qr);
@@ -409,10 +409,11 @@ async function renderMain(){
       const acts=el('div','m-actions');const rb=el('button','btn');rb.style.cssText='background:#eef2f6;color:#46586a';
       rb.textContent=t('Recall this letter (works only before delivery)');
       rb.onclick=async()=>{
+        const a=await askModal({title:t('Recall this letter?'),body:t('It works only while the letter is still on the relay. Once they have received it, it cannot be recalled.'),actions:[{label:t('Recall'),value:1,kind:'danger'}]});if(!a)return;
         rb.disabled=true;
-        let r=null;try{r=await (await fetch('/api/unsend',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:sel.pair,msg:sel.id})})).json();}catch{}
-        if(r&&r.removed){sel.status='unsent';cache.sent=null;await loadList();renderMain();}
-        else{rb.textContent=t('Could not recall — it already left the relay');}
+        let r=null;try{r=await postJson('/api/unsend',{id:sel.pair,msg:sel.id});}catch(e){toast(tf('Could not recall: {msg}',{msg:e.message}),'err');rb.disabled=false;return;}
+        if(r.removed){toast(t('Recalled. They will not receive it.'));sel.status='unsent';cache.sent=null;await loadList();renderMain();}
+        else{const n=el('div','cropsub');n.textContent=t('Could not recall — it already left the relay');rb.replaceWith(n);}
       };
       acts.append(rb);M.append(acts);
     }

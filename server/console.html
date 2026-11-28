@@ -84,9 +84,18 @@
   .m-title{font-size:17px;font-weight:800}.m-meta{font-size:12px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
   .m-body{flex:1;overflow-y:auto;padding:26px 28px}
   .letter{font-size:15.5px;line-height:1.95;white-space:pre-wrap;color:var(--ink);max-width:760px}
+  .letter.outside{background:#fffdf6;border:1px dashed #e2c98a;border-radius:12px;padding:18px 22px}
+  .outside-tag{font-size:12px;color:#8a6d1f;background:#fbf3dc;border-radius:9px;padding:7px 12px;margin-bottom:10px;max-width:760px;display:inline-block}
   .flagbar{font-size:12.5px;color:var(--red);background:#fdecee;border:1px solid #f6c9cf;border-radius:10px;padding:11px 14px;margin-bottom:16px;font-weight:600;max-width:760px}
   .m-actions{display:flex;gap:11px;padding:16px 28px;border-top:1px solid var(--line)}
   .btn{border:0;border-radius:11px;padding:13px 18px;font-size:14.5px;font-weight:700;cursor:pointer}.btn:active{transform:scale(.99)}
+  .btn:disabled,.quickbtn:disabled{opacity:.45;cursor:default;transform:none}
+  /* 押したあとの知らせ（console-ui.js の toast）・小窓の × */
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#16202b;color:#fff;font-size:13.5px;font-weight:600;padding:11px 18px;border-radius:11px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:300;max-width:min(560px,90vw)}
+  .toast.err{background:var(--red)}
+  .dialog,.croppanel{position:relative}
+  .xclose{position:sticky;top:0;float:right;margin:-8px -8px 0 8px;border:0;background:#eef2f6;color:#46586a;border-radius:9px;width:32px;height:32px;font-size:19px;line-height:1;cursor:pointer;z-index:2}
+  .xclose:hover{background:#e2e8ef}
   .btn.apply{background:var(--blue);color:#fff}
   .btn.decline{background:#eef2f6;color:var(--ink)}
   .m-empty{margin:auto;text-align:center;color:var(--muted);font-size:13px;line-height:1.9}
@@ -245,7 +254,7 @@
     <div id="chList"></div>
     <div class="ilabel" style="margin-top:15px" data-ja="新着通知をChatworkにも送る（任意）">Also send new-arrival alerts to Chatwork (optional)</div>
     <div class="exp" style="margin:0 0 9px" data-ja="新着があったとき「誰から何件」だけをChatworkに送ります（本文は送りません）。トークンはこのMacにだけ保存され、相手には伝わりません。マイチャット宛にすればスマホにプッシュが届きます。">When something arrives, only "who and how many" goes to Chatwork — never the letter itself. The token stays on this Mac and is never shared. Point it at My Chat and your phone gets a push.</div>
-    <input class="setin" id="cwToken" placeholder="Chatwork API token" data-ja-placeholder="Chatwork APIトークン" autocomplete="off">
+    <div class="irow"><input class="setin" id="cwToken" type="password" placeholder="Chatwork API token" data-ja-placeholder="Chatwork APIトークン" autocomplete="off" spellcheck="false"><button type="button" class="btn decline" id="cwShow" style="min-width:0;padding:11px 14px" data-ja="表示">Show</button></div>
     <input class="setin" id="cwRoom" placeholder="Room ID (the My Chat number)" data-ja-placeholder="ルームID（マイチャットの数字）" style="margin-top:8px">
     <input class="setin" id="cwAccount" placeholder="Account ID (optional; adds To so your phone gets pushed)" data-ja-placeholder="アカウントID（任意・入れるとTo付きでスマホ通知が届く）" style="margin-top:8px">
     <div id="blockWrap" style="display:none">
@@ -258,16 +267,26 @@
 
   <div class="scrim" id="connScrim"><div class="dialog">
     <h3 class="dh" data-ja="つながる">Connect</h3><div class="dsub" data-ja="離れた相手には招待リンク、目の前ならQR。">Invite link for someone far away. QR for someone in front of you.</div>
+    <div id="connMain">
     <div class="ilabel" data-ja="招待リンク（LINE等で送る）">Invite link (send it over chat)</div>
     <div class="irow"><input id="inviteLink" readonly><button class="btn apply" style="min-width:0;padding:11px 15px" id="copyBtn" data-ja="コピー">Copy</button></div>
     <div class="exp" id="inviteExp"></div>
+    <button class="btn decline" id="reInvite" style="display:none;min-width:0;padding:9px 14px;font-size:13px;margin-bottom:8px" data-ja="新しいリンクを作る">Make a new link</button>
     <button class="segbtn" id="toggleQR" data-ja="目の前の相手と QR でつなぐ ▾">Connect by QR, face to face ▾</button>
     <div id="qrSection" style="display:none;text-align:center"><div class="qrwrap"><img id="qrImg" alt="QR"></div><div class="exp" id="qrExp"></div></div>
     <button class="link" id="pasteLink" data-ja="受け取ったリンク／QR内容を貼り付ける">Paste a link or QR contents you received</button>
+    </div>
+    <div id="pasteBox" style="display:none">
+      <div class="ilabel" data-ja="受け取った招待リンク（またはQRの中身）">The invite link (or QR contents) you received</div>
+      <textarea class="setin" id="pasteIn" rows="4" spellcheck="false"></textarea>
+      <div class="exp" data-ja="貼り付けでつないだ相手は「確認なし」になります。あとで番号の読み合わせなどで確かめられます。">Someone connected by pasting is marked "not confirmed". You can confirm later, for example by reading numbers aloud.</div>
+      <div class="cropacts" style="margin-top:12px"><button class="btn decline" id="pasteBack" style="flex:1" data-ja="← 戻る">← Back</button><button class="btn apply" id="pasteGo" style="flex:1" data-ja="つなぐ">Connect</button></div>
+    </div>
   </div></div>
 
 <script src="/console-i18n.js?v=20261015a"></script>
 <script src="/console-base.js?v=20260815a"></script>
+<script src="/console-ui.js?v=20261128a"></script>
 <script src="/console-modals.js?v=20261015a"></script>
 <script src="/console-settings.js?v=20261015a"></script>
 <script src="/console.js?v=20261015a"></script>

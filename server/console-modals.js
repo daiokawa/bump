@@ -17,7 +17,8 @@ function openPairSettings(pairId,P){
   const hint=el('div');hint.style.cssText='font-size:11.5px;color:var(--muted);margin:8px 2px 11px';
   hint.textContent=t('This display name exists only on your side. Save it empty to go back to the original. They will never see it.');
   const sb=el('button','btn apply');sb.style.cssText='min-width:0;padding:9px 15px;font-size:13px';sb.textContent=t('Save display name');
-  sb.onclick=async()=>{await fetch('/api/rename',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pairId,alias:inp.value})});sb.textContent=t('Saved');loadList();setTimeout(()=>{scrim.remove();renderMain();},600);};
+  sb.onclick=async()=>{sb.disabled=true;try{await postJson('/api/rename',{id:pairId,alias:inp.value});toast(t('Saved.'));loadList();renderMain();}catch(e){toast(tf('Could not save: {msg}',{msg:e.message}),'err');}sb.disabled=false;};
+  inp.onkeydown=(e)=>{if(e.key==='Enter'&&!sb.disabled)sb.click();};
   cr.append(inp,hint,sb);panel.append(cr);
   // 安全性
   const c1=el('div','card2');const h1=el('h4');h1.textContent=t('Safety');c1.append(h1);
@@ -28,25 +29,19 @@ function openPairSettings(pairId,P){
   // オンライン開示
   const c2=el('div','card2');const r=el('div','swrow');const box=el('div');const t3=el('div');t3.style.cssText='font-size:13px;font-weight:700';t3.textContent=t('Show this person when you are online');const d=el('div');d.style.cssText='font-size:11.5px;color:var(--muted);margin-top:2px';d.textContent=t('Off (default): they cannot tell whether you are online.');box.append(t3,d);
   const sw=el('div','sw'+(P.visible?' on':''));sw.append(el('i'));
-  sw.onclick=async()=>{P.visible=!P.visible;sw.classList.toggle('on',P.visible);await fetch('/api/visibility',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pairId,on:P.visible})});loadList();};
+  sw.onclick=async()=>{const want=!P.visible;sw.classList.toggle('on',want);
+    try{await postJson('/api/visibility',{id:pairId,on:want});P.visible=want;toast(t('Saved.'));loadList();}
+    catch(e){sw.classList.toggle('on',P.visible);toast(tf('Could not save: {msg}',{msg:e.message}),'err');}};
   r.append(box,sw);c2.append(r);panel.append(c2);
   // 縁を解く（不可逆なので名前の確認つき）。履歴は既定で残す。
   const cd=el('div','card2');const hd2=el('h4');hd2.textContent=t('Release the bond with this person');cd.append(hd2);
   const dw=el('div');dw.style.cssText='font-size:11.5px;color:var(--muted);margin-bottom:10px';
   dw.textContent=t('Releasing removes them from your contacts, and their letters stop arriving (they are not notified). Your history stays. To connect again, start over from an invite or a connection request.');
   const del=el('button','btn');del.style.cssText='background:#fdecec;color:var(--red);padding:9px 15px;font-size:13px';del.textContent=t('Release the bond');
-  del.onclick=async()=>{
-    const label=P.label||nm(pairId);
-    const typed=prompt(tf('Really release the bond? To confirm, type their name "{name}".',{name:label}),'');
-    if(typed!==label){if(typed!==null)alert(t('The name did not match, so nothing was done.'));return;}
-    const purge=confirm(t('Delete the whole history too?\n\nOK = delete the history as well (cannot be undone)\nCancel = release the bond, keep the history (recommended)'));
-    const r=await (await fetch('/api/unengage',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:pairId,purge})})).json();
-    if(r.error){alert(r.error);return;}
-    scrim.remove();sel=null;loadList();renderMain();refreshBadge();
-  };
+  del.onclick=()=>releaseBond(pairId,P.label||nm(pairId),()=>{scrim.remove();sel=null;loadList();renderMain();refreshBadge();});
   cd.append(dw,del);panel.append(cd);
   const acts=el('div','cropacts');const close=el('button','btn');close.style.cssText='flex:1;background:#eef2f6;color:#46586a';close.textContent=t('Close');close.onclick=()=>scrim.remove();acts.append(close);panel.append(acts);
-  scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
+  addClose(scrim,panel);scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
 }
 // 接続リクエストの承認。本人確認は、専用パッケージに焼き込んだ合言葉の照合で済ませる（機械の仕事）。
 // 合言葉が無い申請（旧パッケージ・手動で招待した相手）だけ、device番号の読み合わせを案内する。
@@ -123,7 +118,7 @@ function openApprove(p,after){
   const cancel=el('button','btn');cancel.style.cssText='flex:1;background:#eef2f6;color:#46586a';cancel.textContent=t('Later');cancel.onclick=()=>scrim.remove();
   const ok=el('button','btn apply');ok.style.flex='1.3';ok.textContent=t('Approve');ok.onclick=()=>go(ok);
   acts.append(cancel,ok);panel.append(acts);
-  scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
+  addClose(scrim,panel);scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
 }
 // 相手のプロフィール（アイコン・バナー・名前・リンク）をモーダルで表示。リンクはhttp(s)のみ開ける。
 async function openProfile(pairId){
@@ -147,7 +142,7 @@ async function openProfile(pairId){
     body.append(vr);}
   panel.append(body);
   const acts=el('div','cropacts');acts.style.cssText='padding:6px 20px 18px';const close=el('button','btn');close.style.cssText='flex:1;background:#eef2f6;color:#46586a';close.textContent=t('Close');close.onclick=()=>scrim.remove();acts.append(close);panel.append(acts);
-  scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
+  addClose(scrim,panel);scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
 }
 
 
@@ -167,19 +162,21 @@ async function openTabs(pair,id){
     btn.onclick=async()=>{
       const r=await (await fetch('/api/framed',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pair,id})})).json();
       if(r.error){alert(r.error);return;}
-      try{await navigator.clipboard.writeText(r.framed);btn.textContent=t('✓ Copied (paste it into Claude)');}
-      catch(e){ // クリップボードが使えない時は選択できる形で出す
+      try{await navigator.clipboard.writeText(r.framed);btn.textContent=t('✓ Copied (paste it into Claude)');
+        setTimeout(()=>{closeAll();toast(t('✓ Copied (paste it into Claude)'));refreshBadge();loadList();renderMain();},900);}
+      catch(e){ // クリップボードが使えない時は選択できる形で出す。写し終えるまで閉じない（× か Esc で閉じる）
         const ta=el('textarea','setin');ta.rows=10;ta.value=r.framed;ta.style.marginTop='10px';list.append(ta);ta.select();
         btn.textContent=t('Select and copy the text below');
       }
-      setTimeout(()=>{closeAll();sel=null;refreshBadge();loadList();renderMain();},1500);
     };
     list.append(e,btn);
   }
   else { $('tabHd').textContent=t('Which Claude should read this?'); $('tabSub').textContent=t('Inspected, framed as external data, and fed into the tab you choose.'); }
   tabs.forEach(t7=>{
     const row=el('div','tabrow');const av=el('div','tabav');av.textContent='🖥';const box=el('div');const n=el('div','tn');n.textContent=t7.session;const c=el('div','tc');c.textContent=t7.cwd;box.append(n,c);row.append(av,box);
-    row.onclick=async()=>{await fetch('/api/apply',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pair,id,tab:t7.session})});closeAll();sel=null;refreshBadge();loadList();renderMain();};
+    row.onclick=async()=>{if(row.dataset.busy)return;row.dataset.busy='1';row.style.opacity='.5';
+      try{await postJson('/api/apply',{pair,id,tab:t7.session});closeAll();toast(tf('Handed to the {tab} tab.',{tab:t7.session}));refreshBadge();loadList();renderMain();}
+      catch(e){delete row.dataset.busy;row.style.opacity='';toast(tf('Could not hand it over: {msg}',{msg:e.message}),'err');}};
     list.append(row);
   });
   $('tabScrim').classList.add('on');
@@ -253,14 +250,17 @@ function openVerify(pair,id,L){
   scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim){scrim.remove();renderMain();}});document.body.append(scrim);
 }
 $('settings').onclick=async()=>{const p=await (await fetch('/api/profile')).json();$('pName').value=p.name||'';$('pLinks').value=p.links||'';avatarData=p.avatar||'';bannerData=p.banner||'';renderPics();populateChannels(p.channels);
-  const nc=await (await fetch('/api/notify')).json().catch(()=>({}));$('cwToken').value=nc.chatworkToken||'';$('cwRoom').value=nc.chatworkRoom||'';$('cwAccount').value=nc.chatworkAccount||'';
+  const nc=await (await fetch('/api/notify')).json().catch(()=>({}));$('cwToken').value=nc.chatworkToken||'';$('cwToken').type='password';$('cwShow').textContent=t('Show');$('cwRoom').value=nc.chatworkRoom||'';$('cwAccount').value=nc.chatworkAccount||'';
   renderBlocked();
   // 自分の指紋（相手の本人確認に答えるための番号）。state から取る＝常に手元の鍵の値。
   try{const st=await (await fetch('/api/state')).json();$('meFp').textContent=fpGroups(st.me&&st.me.device_id);}catch{}
   $('setScrim').classList.add('on');};
-$('pSave').onclick=async()=>{
-  await fetch('/api/profile',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:$('pName').value,icon:'',avatar:avatarData,banner:bannerData,links:$('pLinks').value,channels:collectChannels()})});
-  await fetch('/api/notify',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({chatworkToken:$('cwToken').value,chatworkRoom:$('cwRoom').value,chatworkAccount:$('cwAccount').value})});
-  $('pSave').textContent=t('Saved');setTimeout(()=>{$('pSave').textContent=t('Save');closeAll();loadList();renderMe();},700);};
+$('pSave').onclick=async()=>{const b=$('pSave');b.disabled=true;
+  try{
+    await postJson('/api/profile',{name:$('pName').value,icon:'',avatar:avatarData,banner:bannerData,links:$('pLinks').value,channels:collectChannels()});
+    await postJson('/api/notify',{chatworkToken:$('cwToken').value,chatworkRoom:$('cwRoom').value,chatworkAccount:$('cwAccount').value});
+    closeAll();toast(t('Saved.'));loadList();renderMe();
+  }catch(e){toast(tf('Could not save: {msg}',{msg:e.message}),'err');}
+  b.disabled=false;};
 
 // つながる

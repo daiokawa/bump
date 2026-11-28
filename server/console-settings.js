@@ -55,10 +55,33 @@ function collectChannels(){const out=[];CH_PRESETS.forEach(p=>{const cb=$('ch_'+
 // 照会ログ（別経路で連絡しに行った過去の行為）。「確認済み」等の状態は出さない。
 
 let invTimer=null,qrLoaded=false;
-$('add').onclick=async()=>{$('connScrim').classList.add('on');qrLoaded=false;$('qrSection').style.display='none';const inv=await (await fetch('/api/invite')).json();$('inviteLink').value=location.origin+'/join#i='+inv.token;clearInterval(invTimer);const tick=()=>{const s=Math.max(0,Math.round((Date.parse(inv.expires_at)-Date.now())/1000));$('inviteExp').textContent=s>0?tf('Valid for {m}:{s}. When they open it, their request appears here — approve it to connect.',{m:Math.floor(s/60),s:String(s%60).padStart(2,'0')}):t('Expired. Close and reopen.');};tick();invTimer=setInterval(tick,1000);};
-$('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('inviteLink').value);}catch(e){$('inviteLink').select();document.execCommand('copy');}$('copyBtn').textContent=t('Copied');setTimeout(()=>$('copyBtn').textContent=t('Copy'),1400);};
-$('toggleQR').onclick=async()=>{const s=$('qrSection');const showing=s.style.display!=='none';s.style.display=showing?'none':'block';$('toggleQR').textContent=showing?t('Connect in person with QR ▾'):t('Connect in person with QR ▴');if(!showing&&!qrLoaded){const d=await (await fetch('/api/qr')).json();$('qrImg').src=d.dataUri;qrLoaded=true;$('qrExp').textContent=t('They scan it with their camera — recorded as confirmed in person.');}};
-$('pasteLink').onclick=async()=>{const raw=prompt(t('Paste the invite link / QR / bundle you received (connects without verification)'));if(!raw)return;let bundle=raw.trim();const m=raw.match(/i=([A-Za-z0-9\-_]+)/);if(m){try{const bin=atob(m[1].replace(/-/g,'+').replace(/_/g,'/'));bundle=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))));}catch(e){}}/* UTF-8として読む（日本語の名前で署名が合わなくなっていた） */const r=await (await fetch('/api/scan',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bundle,via:'paste'})})).json();if(r.error){alert(tf('Could not connect: {error}',{error:r.error}));return;}closeAll();setSection('pairs');};
+// 開くたびに新しいリンクを作る。届くまでは古いリンクを見せず、コピーもさせない（期限切れを写さない）。
+async function makeInvite(){
+  const box=$('inviteLink'),cp=$('copyBtn'),ex=$('inviteExp');clearInterval(invTimer);
+  box.value=t('Making a link…');cp.disabled=true;ex.textContent='';$('reInvite').style.display='none';
+  let inv;try{const r=await fetch('/api/invite');if(!r.ok)throw new Error('HTTP '+r.status);inv=await r.json();}
+  catch(e){box.value='';ex.textContent=tf('Could not make a link: {msg}',{msg:e.message});$('reInvite').style.display='';return;}
+  box.value=location.origin+'/join#i='+inv.token;cp.disabled=false;
+  const tick=()=>{const s=Math.max(0,Math.round((Date.parse(inv.expires_at)-Date.now())/1000));
+    if(s>0){ex.textContent=tf('Valid for {m}:{s}. When they open it, their request appears here — approve it to connect.',{m:Math.floor(s/60),s:String(s%60).padStart(2,'0')});return;}
+    clearInterval(invTimer);ex.textContent=t('This link has expired.');cp.disabled=true;$('reInvite').style.display='';};
+  tick();invTimer=setInterval(tick,1000);
+}
+$('add').onclick=()=>{$('connScrim').classList.add('on');showPaste(false);qrLoaded=false;$('qrSection').style.display='none';$('toggleQR').textContent=t('Connect in person with QR ▾');makeInvite();};
+$('reInvite').onclick=()=>makeInvite();
+$('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText($('inviteLink').value);}catch(e){$('inviteLink').select();document.execCommand('copy');}toast(t('✓ Copied'));};
+$('toggleQR').onclick=async()=>{const s=$('qrSection');const showing=s.style.display!=='none';s.style.display=showing?'none':'block';$('toggleQR').textContent=showing?t('Connect in person with QR ▾'):t('Connect in person with QR ▴');
+  if(!showing&&!qrLoaded){try{const d=await (await fetch('/api/qr')).json();$('qrImg').src=d.dataUri;qrLoaded=true;$('qrExp').textContent=t('They scan it with their camera — recorded as confirmed in person.');}catch(e){$('qrExp').textContent=tf('Could not make a link: {msg}',{msg:e.message});}}};
+// 受け取ったリンクを貼る：小窓の中で切り替える（← 戻る で招待リンクの画面へ）。
+function showPaste(on){$('connMain').style.display=on?'none':'';$('pasteBox').style.display=on?'':'none';if(on){$('pasteIn').value='';$('pasteIn').focus();}}
+$('pasteLink').onclick=()=>showPaste(true);
+$('pasteBack').onclick=()=>showPaste(false);
+$('pasteGo').onclick=async()=>{const raw=$('pasteIn').value.trim();if(!raw){toast(t('Paste a link first.'),'err');return;}
+  let bundle=raw;const m=raw.match(/i=([A-Za-z0-9\-_]+)/);if(m){try{const bin=atob(m[1].replace(/-/g,'+').replace(/_/g,'/'));bundle=JSON.parse(new TextDecoder().decode(Uint8Array.from(bin,c=>c.charCodeAt(0))));}catch(e){}}/* UTF-8として読む（日本語の名前で署名が合わなくなっていた） */
+  const b=$('pasteGo');b.disabled=true;
+  try{const r=await postJson('/api/scan',{bundle,via:'paste'});closeAll();toast(t('Connected.'));await setSection('pairs');if(r.id){sel={type:'pair',pair:r.id};renderList();renderMain();}}
+  catch(e){toast(tf('Could not connect: {error}',{error:e.message}),'err');}
+  b.disabled=false;};
 
 function closeAll(){document.querySelectorAll('.scrim').forEach(s=>s.classList.remove('on'));clearInterval(invTimer);}
 document.querySelectorAll('.scrim').forEach(s=>s.addEventListener('click',e=>{if(e.target===s)closeAll();}));

@@ -212,6 +212,7 @@ export async function inboxJson() {
       items.push({ pair: id, id: m.id, at: m.created_at, label: contactLabel(id, peer.name, peer.alias, peer.ai), icon: peer.icon || '', avatar: peer.avatar || '',
         unread: !op.has(m.id), // 開いていない＝未読（バッジに数える）
         triage: tri[m.id] || '', // ''｜'applied'｜'declined'（手当ての結果）
+        snip: String(m.body || '').split('\n').map((x) => x.trim()).find(Boolean)?.slice(0, 80) || '', // 一覧で見分けるための冒頭1行
         suspicious: sc[m.id] && sc[m.id].flag ? { reason: sc[m.id].reason } : false });
     }
   }
