@@ -212,7 +212,7 @@ function renderList(){
       const g=el('div','grow');const r1=el('div','r1');const n=el('div','nm'+(isUnread?' unread':''));n.textContent=it.label||nm(it.pair);const tm=el('div','time');tm.textContent=ts(it.at);r1.append(n,tm);
       const stat=letterState(it);
       const r2=el('div','r2');const s=el('span');s.textContent=stat;r2.append(s);if(it.suspicious){const w=el('span','warn');w.textContent='⚠';r2.append(w);}
-      if(it.snip){const sn=el('span');sn.style.cssText='overflow:hidden;text-overflow:ellipsis;color:var(--ink);opacity:.75';sn.textContent=it.snip;r2.append(sn);}
+      if(it.snip){const sn=el('span');sn.style.cssText='overflow:hidden;text-overflow:ellipsis;color:var(--ink);opacity:'+(isUnread?'1':'.75');sn.textContent=it.snip;r2.append(sn);}
       g.append(r1,r2);row.append(av,g);L.append(row);
     });
   }else if(section==='pairs'){
