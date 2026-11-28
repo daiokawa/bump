@@ -7,7 +7,7 @@ function mHead(av,title,meta,status,statusCls,onClick){const h=el('div','m-head'
   if(onClick){av.style.cursor='pointer';t2.style.cursor='pointer';t2.title=t('View profile');av.onclick=onClick;t2.onclick=onClick;}
   if(status){const st=el('div','m-status'+(statusCls?' '+statusCls:''));st.textContent=status;h.append(st);}
   return h;}
-// 相手ごとの設定モーダル（表示名・安全性・オンライン開示）。⚙から開く。
+// 相手ごとの設定モーダル（上に表示名と手紙の区分、残りは折りたたみ）。「設定」から開く。
 function openPairSettings(pairId,P){
   const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.cssText='max-width:480px;width:min(480px,calc(100vw - 40px))';
   const hd=el('div','crophd');hd.textContent=tf('Settings for {name}',{name:P.label||nm(pairId)});panel.append(hd);
@@ -20,26 +20,27 @@ function openPairSettings(pairId,P){
   sb.onclick=async()=>{sb.disabled=true;try{await postJson('/api/rename',{id:pairId,alias:inp.value});toast(t('Saved.'));loadList();renderMain();}catch(e){toast(tf('Could not save: {msg}',{msg:e.message}),'err');}sb.disabled=false;};
   inp.onkeydown=(e)=>{if(e.key==='Enter'&&!sb.disabled)sb.click();};
   cr.append(inp,hint,sb);panel.append(cr);
-  // 安全性
-  const c1=el('div','card2');const h1=el('h4');h1.textContent=t('Safety');c1.append(h1);
+  // 手紙の区分。自動報告にすると、着信の「自動報告」側に並ぶ（通知はどちらでも同じように届く）。
+  const cc=el('div','card2');const hc=el('h4');hc.textContent=t('Their letters are');cc.append(hc);
+  const seg=el('div','seg');seg.style.margin='0 0 8px';
+  [['person',t('Letters from a person')],['report',t('Automatic reports')]].forEach(([v,lb])=>{const o=el('div','t'+((P.category||'person')===v?' active':''));o.textContent=lb;
+    o.onclick=async()=>{if(o.classList.contains('active'))return;try{await postJson('/api/category',{id:pairId,category:v});P.category=v;[...seg.children].forEach(x=>x.classList.toggle('active',x===o));toast(t('Saved.'));loadList();refreshBadge();}catch(e){toast(tf('Could not save: {msg}',{msg:e.message}),'err');}};seg.append(o);});
+  const ch=el('div');ch.style.cssText='font-size:11.5px;color:var(--muted);line-height:1.7';ch.textContent=t('Automatic reports (from a watcher or a bot) are listed apart so letters from people do not get buried. Notifications still come the same way.');
+  cc.append(seg,ch);panel.append(cc);
+  // めったに見ないものは折りたたむ（安全番号・確認の方法・相手の版・縁を解く）。
+  const more=el('details','card2');const sm=el('summary');sm.style.cssText='cursor:pointer;font-size:13px;font-weight:800;color:#46586a';sm.textContent=t('More');more.append(sm);
   const kv=(k,v)=>{const r=el('div','kv');const kk=el('div','k');kk.textContent=k;const vv=el('div','v');vv.textContent=v;r.append(kk,vv);return r;};
-  c1.append(kv(t('Authority'),t('Zero (no tool execution, no shell, no file access)')));
-  c1.append(kv(t('How confirmed'),confirmLabel(P.confirmed)));
-  const snl=el('div','kv');const snk=el('div','k');snk.textContent=t('Safety number');const snv=el('div','sn');snv.textContent=P.safety;snl.append(snk,snv);c1.append(snl);panel.append(c1);
-  // オンライン開示
-  const c2=el('div','card2');const r=el('div','swrow');const box=el('div');const t3=el('div');t3.style.cssText='font-size:13px;font-weight:700';t3.textContent=t('Show this person when you are online');const d=el('div');d.style.cssText='font-size:11.5px;color:var(--muted);margin-top:2px';d.textContent=t('Off (default): they cannot tell whether you are online.');box.append(t3,d);
-  const sw=el('div','sw'+(P.visible?' on':''));sw.append(el('i'));
-  sw.onclick=async()=>{const want=!P.visible;sw.classList.toggle('on',want);
-    try{await postJson('/api/visibility',{id:pairId,on:want});P.visible=want;toast(t('Saved.'));loadList();}
-    catch(e){sw.classList.toggle('on',P.visible);toast(tf('Could not save: {msg}',{msg:e.message}),'err');}};
-  r.append(box,sw);c2.append(r);panel.append(c2);
+  more.append(kv(t('Authority'),t('Zero (no tool execution, no shell, no file access)')));
+  more.append(kv(t('How confirmed'),confirmLabel(P.confirmed)));
+  const snl=el('div','kv');const snk=el('div','k');snk.textContent=t('Safety number');const snv=el('div','sn');snv.textContent=P.safety;snl.append(snk,snv);more.append(snl);
+  more.append(kv(t('bump version'),!P.version?t('not reported (older version)'):tf('{v} (as of {at})',{v:P.version,at:ts(P.version_at)})+(P.my_version&&P.version!==P.my_version?' — '+tf('yours is {v}',{v:P.my_version}):'')));
   // 縁を解く（不可逆なので名前の確認つき）。履歴は既定で残す。
-  const cd=el('div','card2');const hd2=el('h4');hd2.textContent=t('Release the bond with this person');cd.append(hd2);
+  const cd=el('div');cd.style.marginTop='14px';const hd2=el('h4');hd2.textContent=t('Release the bond with this person');cd.append(hd2);
   const dw=el('div');dw.style.cssText='font-size:11.5px;color:var(--muted);margin-bottom:10px';
   dw.textContent=t('Releasing removes them from your contacts, and their letters stop arriving (they are not notified). Your history stays. To connect again, start over from an invite or a connection request.');
   const del=el('button','btn');del.style.cssText='background:#fdecec;color:var(--red);padding:9px 15px;font-size:13px';del.textContent=t('Release the bond');
   del.onclick=()=>releaseBond(pairId,P.label||nm(pairId),()=>{scrim.remove();sel=null;loadList();renderMain();refreshBadge();});
-  cd.append(dw,del);panel.append(cd);
+  cd.append(dw,del);more.append(cd);panel.append(more);
   const acts=el('div','cropacts');const close=el('button','btn');close.style.cssText='flex:1;background:#eef2f6;color:#46586a';close.textContent=t('Close');close.onclick=()=>scrim.remove();acts.append(close);panel.append(acts);
   addClose(scrim,panel);scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
 }
@@ -120,32 +121,6 @@ function openApprove(p,after){
   acts.append(cancel,ok);panel.append(acts);
   addClose(scrim,panel);scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
 }
-// 相手のプロフィール（アイコン・バナー・名前・リンク）をモーダルで表示。リンクはhttp(s)のみ開ける。
-async function openProfile(pairId){
-  let P={}; try{P=await (await fetch('/api/pair?id='+encodeURIComponent(pairId))).json();}catch{}
-  const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.cssText='max-width:420px;width:min(420px,calc(100vw - 40px));padding:0;overflow:hidden';
-  if(imgOk(P.banner)){const bn=el('div','detail-banner');const im=el('img');im.src=P.banner;bn.append(im);panel.append(bn);}
-  const body=el('div');body.style.cssText='padding:18px 20px 6px';
-  const head=el('div');head.style.cssText='display:flex;align-items:center;gap:12px';
-  const av=avaInto(el('div','m-ava'),{avatar:P.avatar,icon:P.icon,text:ini(P.label,pairId)});av.style.background=color(pairId);
-  const nmv=el('div');nmv.style.cssText='font-size:17px;font-weight:800;color:var(--ink)';nmv.textContent=P.label||nm(pairId);
-  head.append(av,nmv);body.append(head);
-  if((P.links||'').trim()){const lk=el('div','inqlog');
-    P.links.split(/\n+/).map(s=>s.trim()).filter(Boolean).forEach(u=>{const row=el('div','plink');
-      if(/^https?:\/\//i.test(u)){const a=el('a');a.href=u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=u;row.append(a);}else{const s=el('span');s.textContent=u;row.append(s);}lk.append(row);});
-    body.append(lk);}
-  else{const none=el('div','cropsub');none.style.marginTop='12px';none.textContent=t('No profile info yet.');body.append(none);}
-  // 相手が動かしている bump の版（プロフィールと一緒に届く。旧版の相手からは届かない）。
-  {const vr=el('div','cropsub');vr.style.marginTop='10px';
-    vr.textContent=!P.version?t('bump version: not reported (older version)')
-      :tf('bump version: {v} (as of {at})',{v:P.version,at:ts(P.version_at)})+(P.my_version&&P.version!==P.my_version?' — '+tf('yours is {v}',{v:P.my_version}):'');
-    body.append(vr);}
-  panel.append(body);
-  const acts=el('div','cropacts');acts.style.cssText='padding:6px 20px 18px';const close=el('button','btn');close.style.cssText='flex:1;background:#eef2f6;color:#46586a';close.textContent=t('Close');close.onclick=()=>scrim.remove();acts.append(close);panel.append(acts);
-  addClose(scrim,panel);scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
-}
-
-
 // タブ選択
 async function openTabs(pair,id){
   const tabs=await (await fetch('/api/tabs')).json();
@@ -162,6 +137,7 @@ async function openTabs(pair,id){
     btn.onclick=async()=>{
       const r=await (await fetch('/api/framed',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pair,id})})).json();
       if(r.error){alert(r.error);return;}
+      if(sel&&sel.id===id)Object.assign(sel,{triage:'applied',done:true});
       try{await navigator.clipboard.writeText(r.framed);btn.textContent=t('✓ Copied (paste it into Claude)');
         setTimeout(()=>{closeAll();toast(t('✓ Copied (paste it into Claude)'));refreshBadge();loadList();renderMain();},900);}
       catch(e){ // クリップボードが使えない時は選択できる形で出す。写し終えるまで閉じない（× か Esc で閉じる）
@@ -175,7 +151,7 @@ async function openTabs(pair,id){
   tabs.forEach(t7=>{
     const row=el('div','tabrow');const av=el('div','tabav');av.textContent='🖥';const box=el('div');const n=el('div','tn');n.textContent=t7.session+(t7.ai?' · '+t7.ai:'');const c=el('div','tc');c.textContent=t7.cwd;box.append(n,c);row.append(av,box);
     row.onclick=async()=>{if(row.dataset.busy)return;row.dataset.busy='1';row.style.opacity='.5';
-      try{await postJson('/api/apply',{pair,id,tab:t7.session});closeAll();toast(tf('Handed to the {tab} tab.',{tab:t7.session}));refreshBadge();loadList();renderMain();}
+      try{await postJson('/api/apply',{pair,id,tab:t7.session});if(sel&&sel.id===id)Object.assign(sel,{triage:'applied',done:true,handed_to:t7.session});closeAll();toast(tf('Handed to the {tab} tab.',{tab:t7.session}));refreshBadge();loadList();renderMain();}
       catch(e){delete row.dataset.busy;row.style.opacity='';toast(tf('Could not hand it over: {msg}',{msg:e.message}),'err');}};
     list.append(row);
   });
@@ -229,14 +205,18 @@ function renderInqLines(container,list){(list||[]).forEach(iq=>{const line=el('d
 function openDecline(pair,id){
   const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.maxWidth='420px';panel.style.width='min(420px,calc(100vw - 40px))';
   const hd=el('div','crophd');hd.textContent=t('Not this one');const sub=el('div','cropsub');sub.textContent=t('Add a word about why? (Optional) The sender will see it.');
-  const ta=el('textarea','setin');ta.rows=3;ta.placeholder=t('e.g. Intent unclear / route looks off / no time right now');ta.style.resize='vertical';ta.style.marginTop='10px';
-  panel.append(hd,sub,ta);
+  // よくある理由は押すだけで送る（打たずに済む）。自分の言葉で書きたい時だけ下の欄へ。
+  const send=async(reason)=>{try{await postJson('/api/decline',{pair,id,reason});}catch(e){toast(tf('Could not send: {msg}',{msg:e.message}),'err');return;}scrim.remove();toast(t('Declined. They were told.'));sel=null;refreshBadge();loadList();renderMain();};
+  const chips=el('div','chbtns');chips.style.marginTop='10px';
+  [t('I cannot handle this now'),t('Wrong person'),t('Decline without a reason')].forEach((r,i)=>{const c=el('button','chbtn');c.textContent=r;c.onclick=()=>send(i===2?'':r);chips.append(c);});
+  const ta=el('textarea','setin');ta.rows=3;ta.placeholder=t('Or write it in your own words');ta.style.resize='vertical';ta.style.marginTop='12px';
+  panel.append(hd,sub,chips,ta);
   const acts=el('div','cropacts');
   const cancel=el('button','btn');cancel.style.cssText='flex:1;background:#eef2f6;color:#46586a';cancel.textContent=t('Never mind');cancel.onclick=()=>scrim.remove();
   const ok=el('button','btn decline');ok.style.flex='1';ok.textContent=t('Decline and send');
-  ok.onclick=async()=>{await fetch('/api/decline',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({pair,id,reason:ta.value})});scrim.remove();sel=null;refreshBadge();loadList();renderMain();};
+  ok.onclick=()=>send(ta.value);
   acts.append(cancel,ok);panel.append(acts);
-  scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);setTimeout(()=>ta.focus(),60);
+  addClose(scrim,panel);scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
 }
 function openVerify(pair,id,L){
   const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.maxWidth='460px';panel.style.width='min(460px,calc(100vw - 40px))';

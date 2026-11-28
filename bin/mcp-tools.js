@@ -11,7 +11,6 @@ import { identityPath, pairPaths } from '../lib/paths.js';
 import { listPairs, readPeer, readJson, writeJson } from '../lib/store.js';
 import { sendMessage, receiveInbox, sendReceipt, receiptsEnabled, unsendMessage, CONTROL_TYPES } from '../lib/exchange.js';
 import { pushToRelay, pullFromRelay } from '../lib/relay.js';
-import { reachOf } from '../lib/presence.js';
 import { screenMany } from '../lib/guard.js';
 import { replyOf } from '../lib/reply.js';
 import { confirmedBy } from '../lib/pairing.js';
@@ -64,9 +63,8 @@ async function toolEngaged() {
     let peer; try { peer = await readPeer(id); } catch { continue; }
     await pullFromRelay({ pairId: id, relayDir: RELAY, myDeviceId: me.device_id, peerDeviceId: peer && peer.device_id }).catch(() => {});
     await receiveInbox({ identity: me, peer, pairId: id, now }).catch(() => {});
-    const reach = await reachOf({ relayDir: RELAY, pairId: id, peerDeviceId: peer.device_id, nowIso: now() });
     rows.push({ pair: id, name: peer.alias || peer.name || '', trust: confirmedBy(peer),
-      reachable: reach.online, unread: await unreadOf(id, peer.device_id), device: peer.device_id.slice(0, 8) });
+      unread: await unreadOf(id, peer.device_id), device: peer.device_id.slice(0, 8) });
   }
   // my_device_id ＝自分の鍵の指紋。相手が承認の前に「本人ですか」と別経路で聞いてくることがあり、
   // その時に手元Claudeがそのまま答えられるようにここへ載せる（公開鍵由来なので秘密ではない）。

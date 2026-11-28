@@ -30,11 +30,12 @@
   /* 自分プロフィールの常設カード（サイドバー頭・クリックで設定） */
   .meCard{position:relative;border:1px solid var(--line2);border-radius:12px;overflow:hidden;background:#fff;cursor:pointer;transition:.12s}
   .meCard:hover{border-color:var(--blue);box-shadow:0 2px 8px rgba(43,108,176,.12)}
-  .meBanner{aspect-ratio:3/1;background:#dfe8f2}.meBanner img{width:100%;height:100%;object-fit:cover;display:none}.meBanner.has img{display:block}
-  .meRow{display:flex;align-items:center;gap:10px;padding:0 12px 11px}
-  .meAva{width:44px;height:44px;border-radius:11px;border:2px solid #fff;background:#cdd8e3;margin-top:-22px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:800;color:#5b6b7d;font-size:15px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+  .meBanner{display:none}
+  .meRow{display:flex;align-items:center;gap:10px;padding:7px 10px}
+  .meSet{flex-shrink:0;font-size:11.5px;font-weight:700;color:var(--blue);background:#eaf1ff;border-radius:7px;padding:4px 9px}
+  .meAva{width:30px;height:30px;border-radius:8px;border:0;background:#cdd8e3;margin-top:0;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:800;color:#5b6b7d;font-size:12px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
   .meAva img{width:100%;height:100%;object-fit:cover;display:none}.meAva.has img{display:block}.meAva.has span{display:none}
-  .meName{font-size:14.5px;font-weight:800;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-top:6px}
+  .meName{flex:1;min-width:0;font-size:13.5px;font-weight:800;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .addfull{width:100%}
   .warnbtn{border:0;border-radius:7px;padding:5px 9px;margin-right:6px;background:#fdecec;color:var(--red);font-size:11px;font-weight:800;cursor:pointer}
   .warnbtn:hover{background:#fbdcdc}
@@ -57,10 +58,17 @@
   .dot{background:var(--red);color:#fff;font-size:10px;font-weight:800;min-width:16px;height:16px;border-radius:5px;display:flex;align-items:center;justify-content:center;padding:0 4px;cursor:pointer}
   .dot:hover{filter:brightness(1.12)}
   .list{flex:1;overflow-y:auto;padding:2px 8px 12px}
-  .searchrow{position:relative;padding:4px 12px 6px}
-  .searchrow input{width:100%;box-sizing:border-box;border:1px solid var(--line2);border-radius:9px;padding:8px 52px 8px 11px;font-size:13px;background:#fff;color:var(--ink);outline:none}
-  .searchrow input:focus{border-color:#7fb0dd}
-  .searchrow .scount{position:absolute;right:22px;top:50%;transform:translateY(-50%);font-size:11.5px;color:var(--muted);pointer-events:none}
+  .searchrow{display:flex;gap:6px;padding:4px 12px 6px}
+  .searchrow .sq{position:relative;flex:1;min-width:0}
+  .searchrow input{width:100%;box-sizing:border-box;border:1px solid var(--line2);border-radius:9px;padding:8px 34px 8px 10px;font-size:13px;background:#fff;color:var(--ink);outline:none}
+  .searchrow input:focus,.ssort:focus{border-color:#7fb0dd}
+  .searchrow .scount{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11.5px;color:var(--muted);pointer-events:none}
+  .ssort{flex:0 0 auto;max-width:98px;border:1px solid var(--line2);border-radius:9px;padding:0 6px;font-size:12px;background:#fff;color:#46586a;outline:none;cursor:pointer}
+  /* 人の手紙／自動報告 */
+  .catseg{display:flex;gap:2px;margin:0 12px 6px;background:#eef2f6;border-radius:8px;padding:3px}
+  .catseg .t{flex:1;text-align:center;padding:6px 0;font-size:12px;color:var(--muted);border-radius:6px;cursor:pointer}
+  .catseg .t.active{background:#fff;color:var(--ink);font-weight:700;box-shadow:var(--soft)}
+  .catseg .cn{margin-left:5px;font-size:10.5px;font-weight:800;color:var(--blue)}
   .side-foot{padding:10px 12px;border-top:1px solid var(--line)}
   .row{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:9px;cursor:pointer}
   .row.unread{background:#f2f7ff}.row:hover{background:#eef3f8}.row.sel{background:#e4eeff}
@@ -221,18 +229,19 @@
       </div>
       <div class="meCard" id="settings" title="Edit profile (settings)" data-ja-title="プロフィールを編集（設定）">
         <div class="meBanner" id="meBn"><img id="meBnImg" alt=""></div>
-        <div class="meRow"><div class="meAva" id="meAv"><img id="meAvImg" alt=""><span id="meAvPh"></span></div><div class="meName" id="meName"></div></div>
+        <div class="meRow"><div class="meAva" id="meAv"><img id="meAvImg" alt=""><span id="meAvPh"></span></div><div class="meName" id="meName"></div><span class="meSet" data-ja="設定">Settings</span></div>
       </div>
     </div>
     <div class="seg" id="nav">
       <div class="t active" data-s="inbox"><span data-ja="着信">Inbox</span><span class="dot" id="inboxBadge" style="display:none">0</span></div>
       <div class="t" data-s="pairs" data-ja="連絡先">Contacts</div>
-      <div class="t" data-s="sent" data-ja="履歴">Sent</div>
+      <div class="t" data-s="sent" data-ja="送信済み">Sent</div>
     </div>
     <div id="autoBox" class="pendbox" style="display:none"></div>
     <div id="pendingBox" class="pendbox" style="display:none"></div>
     <div id="pkgBox" class="pkgbox" style="display:none"></div>
-    <div class="searchrow" id="searchRow"><input id="inboxQ" type="search" autocomplete="off" spellcheck="false" placeholder="Search by sender or text" data-ja-placeholder="送り主・本文で探す" aria-label="Search the inbox"><span class="scount" id="searchCount"></span></div>
+    <div class="catseg" id="catSeg" style="display:none"><div class="t active" data-c="person"><span data-ja="人の手紙">From people</span><span class="cn"></span></div><div class="t" data-c="report"><span data-ja="自動報告">Automatic reports</span><span class="cn"></span></div></div>
+    <div class="searchrow" id="searchRow"><div class="sq"><input id="inboxQ" type="search" autocomplete="off" spellcheck="false" placeholder="Search by sender or text" data-ja-placeholder="送り主・本文で探す" aria-label="Search the inbox"><span class="scount" id="searchCount"></span></div><select id="inboxSort" class="ssort" aria-label="Sort"><option value="todo" data-ja="まだを上に">To handle first</option><option value="new" data-ja="新しい順">Newest first</option><option value="old" data-ja="古い順">Oldest first</option><option value="sender" data-ja="送り主ごと">By sender</option></select></div>
     <div class="list" id="list"></div>
     <div class="side-foot"><button class="tbtn addfull" id="add" data-ja="＋ ユーザー追加">＋ Add contact</button></div>
   </div>
@@ -303,6 +312,7 @@
 <script src="/console-ui.js?v=20261128b"></script>
 <script src="/console-modals.js?v=20261015a"></script>
 <script src="/console-settings.js?v=20261015a"></script>
+<script src="/console-letter.js?v=20261128a"></script>
 <script src="/console.js?v=20261015a"></script>
 <script src="/console-connect.js?v=20261128a"></script>
 <script src="/console-search.js?v=20261128a"></script>

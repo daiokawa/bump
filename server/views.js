@@ -4,7 +4,7 @@
 
 import { appVersion } from '../lib/version.js';
 import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { identityPath, pairPaths } from '../lib/paths.js';
 import { listPairs, readPeer, readJson, writeJson } from '../lib/store.js';
 import { pairSafetyNumber, confirmedBy } from '../lib/pairing.js';
@@ -13,7 +13,6 @@ const isControl = (m) => CONTROL_TYPES.includes(m.type); // 受領・プロフ�
 import { handleConnectRequests } from '../lib/connect.js';
 import { autoApprovePending } from '../lib/approve.js';
 import { pushToRelay, pullAllFromRelay } from '../lib/relay.js';
-import { beat, reachOf } from '../lib/presence.js';
 import { replyOf } from '../lib/reply.js';
 import { screen, skipScreen } from '../lib/guard.js';
 import { warn } from '../lib/log.js';
@@ -56,7 +55,29 @@ async function screenPair(pairId, peerDeviceId) {
 function triagePath(pairId) { return join(pairPaths(pairId).base, 'triage.json'); }
 async function readTriage(pairId) { try { return await readJson(triagePath(pairId)); } catch { return {}; } }
 export async function markTriage(pairId, id, verdict) { const t = await readTriage(pairId); t[id] = verdict; await writeJson(triagePath(pairId), t); }
-// 既読（本文を開いた）マーカー＝バッジ用。裁定(triage)とは別で、目視で減る。
+// 渡した先のタブ名 { [msgId]: tab }。「jin タブに渡しました」と出すため（triage は文字列のまま保つ）。
+function handedPath(pairId) { return join(pairPaths(pairId).base, 'handed.json'); }
+async function readHanded(pairId) { try { return await readJson(handedPath(pairId)); } catch { return {}; } }
+export async function markHanded(pairId, id, tab) { const h = await readHanded(pairId); h[id] = String(tab || '').slice(0, 80); await writeJson(handedPath(pairId), h); }
+export async function clearTriage(pairId, id) { const t = await readTriage(pairId); if (id in t) { delete t[id]; await writeJson(triagePath(pairId), t); } }
+// 「まだ／済」の2状態（2026-11-28）。済＝AIに渡した・確認した・断った。開いただけでは済にしない。
+// この形に変える前に開いていた手紙まで「まだ」に戻ると、見張りの報告などが一度に溢れるので、
+// 切り替えた時（初回）に開いてあった手紙の番号を控え、それらは済として扱う。元の帳簿は書き換えない。
+let twoState = null;
+async function twoStateDone() {
+  if (twoState) return twoState;
+  const p = join(dirname(identityPath()), 'two-state-since.json');
+  try { const j = await readJson(p); twoState = { at: j.at, done: j.done || {} }; }
+  catch {
+    const done = {};
+    for (const id of await listPairs()) { const o = await readOpened(id); if (o.size) done[id] = [...o]; }
+    twoState = { at: new Date().toISOString(), done }; await writeJson(p, twoState);
+  }
+  for (const k of Object.keys(twoState.done)) if (!(twoState.done[k] instanceof Set)) twoState.done[k] = new Set(twoState.done[k]);
+  return twoState;
+}
+const doneBefore = (ts, pairId, id) => !!(ts.done[pairId] && ts.done[pairId].has(id));
+// 既読（本文を開いた）マーカー＝相手への「読んだ」の送り済み記録。まだ／済とは別。
 function openedPath(pairId) { return join(pairPaths(pairId).base, 'opened.json'); }
 async function readOpened(pairId) { try { return new Set(await readJson(openedPath(pairId))); } catch { return new Set(); } }
 async function markOpened(pairId, id) { const s = await readOpened(pairId); if (s.has(id)) return false; s.add(id); await writeJson(openedPath(pairId), [...s]); return true; }
@@ -148,20 +169,19 @@ export async function stateJson() {
     // 2026-08-16の検証）。読めない・形が違うものは黙って飛ばす。
     let peer; try { peer = await readPeer(id); } catch { continue; }
     if (!peer || typeof peer.device_id !== 'string' || peer.device_id.length < 8) continue;
-    const visible = !!peer.show_presence; // デフォルトは隠す（ステルス）
-    if (visible) await beat({ relayDir: RELAY, pairId: id, myDeviceId: me.device_id, nowIso: now() });
-    const reach = await reachOf({ relayDir: RELAY, pairId: id, peerDeviceId: peer.device_id, nowIso: now() });
     const opened = await readOpened(id);
     const msgs = await messagesOf(id);
     screenPair(id, peer.device_id); // fire-and-forget メタ点検
     const sc = await readScreen(id);
-    const unread = msgs.filter((m) => m.from === peer.device_id && !isControl(m) && !opened.has(m.id)).length;
+    const tri = await readTriage(id), ts2 = await twoStateDone();
+    // まだ＝渡す・確認した・断るのどれもしていない手紙（着信一覧の「まだ」と同じ数え方）
+    const unread = msgs.filter((m) => m.from === peer.device_id && !isControl(m) && !tri[m.id] && !doneBefore(ts2, id, m.id)).length;
     const last = msgs.length ? msgs[msgs.length - 1].created_at : null;
     const flagged = msgs.some((m) => m.from === peer.device_id && sc[m.id] && sc[m.id].flag);
     pairs.push({ id, name: peer.name || '', alias: peer.alias || '', icon: peer.icon || '', avatar: peer.avatar || '', banner: peer.banner || '', label: contactLabel(id, peer.name, peer.alias, peer.ai),
       device: peer.device_id.slice(0, 8), verified: !!peer.verified, confirmed: confirmedBy(peer),
       awaiting: awaitingOf(peer), auto: peer.auto_connected || null,
-      unread, online: reach.online, lastActivity: last, visible, flagged });
+      unread, lastActivity: last, flagged, category: peer.category === 'report' ? 'report' : 'person' });
   }
   return { me: { device_id: me.device_id }, pairs };
 }
@@ -173,7 +193,6 @@ export async function pairJson(id, opt = {}) {
   const peer = await readPeer(id);
   const sn = pairSafetyNumber({ pairId: id, identity: me, peer });
   const all = (await messagesOf(id)).filter((m) => !isControl(m)); // 履歴＝人間の手紙だけ
-  const reach = await reachOf({ relayDir: RELAY, pairId: id, peerDeviceId: peer.device_id, nowIso: now() });
   screenPair(id, peer.device_id);
   const sc = await readScreen(id);
   let list = all;
@@ -187,7 +206,7 @@ export async function pairJson(id, opt = {}) {
     awaiting: awaitingOf(peer), auto: peer.auto_connected || null,
     name: peer.name || '', alias: peer.alias || '', label: contactLabel(id, peer.name, peer.alias, peer.ai),
     avatar: peer.avatar || '', banner: peer.banner || '', links: peer.links || '', channels: sanitizeChannels(peer.channels),
-    safety: sn.display, visible: !!peer.show_presence, online: reach.online, lastSeen: reach.lastSeen,
+    safety: sn.display, category: peer.category === 'report' ? 'report' : 'person',
     version: peer.app_version || '', version_at: peer.app_version_at || '', my_version: await appVersion(),
     total: all.length, hasMore,
     messages: list.map((m) => ({ id: m.id, mine: m.from === me.device_id, body: m.body,
@@ -209,11 +228,17 @@ export async function inboxJson() {
     const sc = await readScreen(id);
     const tri = await readTriage(id);
     const op = await readOpened(id);
+    const handed = await readHanded(id);
+    const ts2 = await twoStateDone();
+    const category = peer.category === 'report' ? 'report' : 'person';
     for (const m of await messagesOf(id)) {
-      if (m.from !== peer.device_id || isControl(m)) continue; // 手当て済み(applied/declined)も一覧に残す
+      if (m.from !== peer.device_id || isControl(m)) continue; // 手当て済み(applied/declined/done)も一覧に残す
+      const triage = tri[m.id] || '';
       items.push({ pair: id, id: m.id, at: m.created_at, label: contactLabel(id, peer.name, peer.alias, peer.ai), icon: peer.icon || '', avatar: peer.avatar || '',
-        unread: !op.has(m.id), // 開いていない＝未読（バッジに数える）
-        triage: tri[m.id] || '', // ''｜'applied'｜'declined'（手当ての結果）
+        unread: !op.has(m.id), // 開いていない
+        triage, // ''｜'applied'｜'declined'｜'done'（手当ての結果）
+        done: !!triage || doneBefore(ts2, id, m.id), // 済（バッジに数えない）
+        handed_to: handed[m.id] || '', category,
         snip: String(m.body || '').split('\n').map((x) => x.trim()).find(Boolean)?.slice(0, 80) || '', // 一覧で見分けるための冒頭1行
         suspicious: sc[m.id] && sc[m.id].flag ? { reason: sc[m.id].reason } : false });
     }

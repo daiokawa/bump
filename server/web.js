@@ -23,7 +23,7 @@ const RELAY = process.env.MM_RELAY || '/tmp/mm-demo/relay';
 process.env.BUMP_HOME = SELF; // 以降 paths.js は自分のエンドを指す
 
 import QRCode from 'qrcode';
-const { readPeer, readJson, ensurePair, writePeer, logEvent, listPairs, writeSecretJson, protectSecrets } = await import('../lib/store.js');
+const { readPeer, readJson, ensurePair, writePeer, logEvent, listPairs, hasPeer, writeSecretJson, protectSecrets } = await import('../lib/store.js');
 const { pairPaths, safePairId } = await import('../lib/paths.js');
 const { engagePeer, markConfirmed, carryConfirmation } = await import('../lib/pairing.js');
 const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage, unsendMessage, safeImage, AVATAR_MAX, BANNER_MAX, receiveInbox } = await import('../lib/exchange.js');
@@ -43,7 +43,7 @@ const { receiveConnectRequests, listPending, readPending, dropPending, sendConne
 const { matchInvite, markInviteUsed, inviteConflict, newLinkInvite, linkClaims, recentLinks } = await import('../lib/invite.js');
 // データ層（サイドカー保存＋画面用JSONビュー）。BUMP_HOME 設定後に読み込む。
 const { identity, stateJson, pairJson, inboxJson, searchInbox, letterJson, sentJson,
-  markTriage, addInquiry, sanitizeChannels, carryLocalPeer, contactLabel, OPEN_SCHEMES,
+  markTriage, markHanded, clearTriage, addInquiry, sanitizeChannels, carryLocalPeer, contactLabel, OPEN_SCHEMES,
   PULL_INTERVAL_MS, freshPull } = await import('./views.js');
 let pendingAt = 0;   // 接続リクエストを最後に中継へ取りに行った時刻
 
@@ -207,7 +207,7 @@ const server = createServer(async (req, res) => {
         let peer = null; try { peer = await readPeer(a.pair); } catch {}
         if (peer && peer.device_id === a.device_id) {
           const base = pairPaths(a.pair).base;
-          for (const f of ['peer.json', 'cursor.json', 'seen.json', 'opened.json', 'triage.json', 'screen.json', 'inquiry.json', 'sent-status.json'])
+          for (const f of ['peer.json', 'cursor.json', 'seen.json', 'opened.json', 'triage.json', 'screen.json', 'inquiry.json', 'sent-status.json', 'handed.json'])
             await rm(join(base, f), { force: true });
           await logEvent(a.pair, { type: 'released', peer: a.device_id, reason: 'auto-connect undone' }, now()).catch(() => {});
         }
@@ -227,7 +227,7 @@ const server = createServer(async (req, res) => {
         await rm(base, { recursive: true, force: true });   // 履歴もろとも
       } else {
         // 縁の証明（peer.json）と手元設定だけ消す。messages/log は残す。
-        for (const f of ['peer.json', 'cursor.json', 'seen.json', 'opened.json', 'triage.json', 'screen.json', 'inquiry.json', 'sent-status.json'])
+        for (const f of ['peer.json', 'cursor.json', 'seen.json', 'opened.json', 'triage.json', 'screen.json', 'inquiry.json', 'sent-status.json', 'handed.json'])
           await rm(join(base, f), { force: true });
       }
       return json(res, 200, { unengaged: id, purged: !!b.purge });
@@ -390,13 +390,6 @@ const server = createServer(async (req, res) => {
       await writePeer(b.id, peer);
       return json(res, 200, { id: b.id, alias: peer.alias, label: contactLabel(b.id, peer.name, peer.alias, peer.ai) });
     }
-    // 自分の到達状態をこの縁に見せる/隠す（デフォルト隠す＝ステルス）。
-    if (url.pathname === '/api/visibility' && req.method === 'POST') {
-      const b = await body(req);
-      const peer = await readPeer(b.id); peer.show_presence = !!b.on;
-      await writePeer(b.id, peer);
-      return json(res, 200, { id: b.id, visible: peer.show_presence });
-    }
     if (url.pathname === '/api/health') {
       const free = await freeBytes();
       // 旧コード席の検知は ps を叩くので、画面の3秒ポーリングに直結させず30秒キャッシュ
@@ -423,7 +416,7 @@ const server = createServer(async (req, res) => {
       // 渡せるのは手元AIが動いているタブだけ。シェルのタブに貼って Enter を送ると、手紙の行がコマンドとして走りうる。
       if (!(await listAiSessions()).some((x) => x.session === b.tab)) return json(res, 400, { error: t('That tab is not running an AI.') });
       await tmuxNotify(b.tab, framedLetter(b.pair, L), true);
-      await markTriage(b.pair, b.id, 'applied');
+      await markTriage(b.pair, b.id, 'applied'); await markHanded(b.pair, b.id, b.tab);
       // 既読は「開いた時点」で送信済み（letterJson）。Applyでは重ねて送らない。
       return json(res, 200, { applied: b.id, tab: b.tab });
     }
@@ -435,6 +428,20 @@ const server = createServer(async (req, res) => {
       if (L.error) return json(res, 404, L);
       await markTriage(b.pair, b.id, 'applied');
       return json(res, 200, { framed: framedLetter(b.pair, L) });
+    }
+    // 確認した（済）：AIに渡さず、相手にも何も返さず、手元だけで済にする。undo で「まだ」に戻す。
+    if (url.pathname === '/api/done' && req.method === 'POST') {
+      const b = await body(req);
+      if (!/^[A-Za-z0-9_-]{1,80}$/.test(String(b.id || '')) || !(await hasPeer(String(b.pair || '')))) return json(res, 404, { error: 'not found' });
+      if (b.undo) await clearTriage(b.pair, b.id); else await markTriage(b.pair, b.id, 'done');
+      return json(res, 200, { id: b.id, done: !b.undo });
+    }
+    // 手紙の区分（人の手紙／自動報告）。一覧の分け方だけで、通知はどちらも同じように届く。
+    if (url.pathname === '/api/category' && req.method === 'POST') {
+      const b = await body(req);
+      const peer = await readPeer(b.id); peer.category = b.category === 'report' ? 'report' : 'person';
+      await writePeer(b.id, peer);
+      return json(res, 200, { id: b.id, category: peer.category });
     }
     if (url.pathname === '/api/decline' && req.method === 'POST') {
       const b = await body(req);

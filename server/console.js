@@ -36,16 +36,17 @@ async function loadList(){
 }
 async function refreshBadge(fresh){
   try{const inb=await (await fetch('/api/inbox'+(fresh?'?fresh=1':''))).json();cache.inbox=inb;
-    const unread=inb.filter(x=>x.unread!==false && !x.triage).length; // 未処理の未読だけバッジに
+    const unread=inb.filter(x=>!x.done).length; // まだの手紙だけバッジに（人の手紙も自動報告も）
     const b=$('inboxBadge');if(unread){b.style.display='';b.textContent=unread;}else b.style.display='none';
     // バッジを押したら未読へ飛ぶ。一覧が長いと未読が下に埋もれて「数字が消えない」と見える
     // （実際に起きた 2026-07-27）。古い順に1件ずつ開いていける。
     b.title=unread?tf('Jump to unread ({n})',{n:unread}):'';
     b.onclick=(e)=>{
       e.stopPropagation();                     // タブ切替のクリックと干渉させない
-      const list=cache.inbox.filter(x=>x.unread!==false&&!x.triage);
+      const list=cache.inbox.filter(x=>!x.done);
       if(!list.length)return;
-      const it=list[list.length-1];            // いちばん古い未読から
+      const it=list[list.length-1];            // いちばん古い「まだ」から
+      if(typeof showCategory==='function')showCategory(it.category);
       if(section!=='inbox'){section='inbox';sel=null;[...$('nav').children].forEach(x=>x.classList.toggle('active',x.dataset.s==='inbox'));loadList().then(()=>jumpTo(it));return;}
       jumpTo(it);
     };
@@ -205,11 +206,11 @@ function renderList(){
   if(section==='inbox'){
     if(!cache.inbox.length)return listEmpty(t('Inbox is empty.'));
     cache.inbox.forEach(it=>{
-      const isUnread=it.unread!==false && !it.triage; // 未読＝未開封かつ未処理
+      const isUnread=!it.done; // まだ＝AIに渡す・確認した・断るのどれもしていない（開いただけでは済にしない）
       const row=el('div','row'+(isUnread?' unread':'')+(sel&&sel.id===it.id?' sel':''));row.onclick=()=>{sel={type:'inbox',...it};renderList();renderMain();};
       const av=avaInto(el('div','ava'),{avatar:it.avatar,icon:it.icon,text:ini(it.label,it.pair)});av.style.background=color(it.pair);
       const g=el('div','grow');const r1=el('div','r1');const n=el('div','nm'+(isUnread?' unread':''));n.textContent=it.label||nm(it.pair);const tm=el('div','time');tm.textContent=ts(it.at);r1.append(n,tm);
-      const stat=it.triage==='applied'?t('✓ Handed'):(it.triage==='declined'?t('✕ Declined'):(it.unread!==false?t('New message'):t('Opened')));
+      const stat=letterState(it);
       const r2=el('div','r2');const s=el('span');s.textContent=stat;r2.append(s);if(it.suspicious){const w=el('span','warn');w.textContent='⚠';r2.append(w);}
       if(it.snip){const sn=el('span');sn.style.cssText='overflow:hidden;text-overflow:ellipsis;color:var(--ink);opacity:.75';sn.textContent=it.snip;r2.append(sn);}
       g.append(r1,r2);row.append(av,g);L.append(row);
@@ -219,10 +220,10 @@ function renderList(){
     cache.pairs.forEach(p=>{
       const row=el('div','row'+(sel&&sel.pair===p.id&&sel.type==='pair'?' sel':''));row.onclick=()=>{sel={type:'pair',pair:p.id};renderList();renderMain();};
       const av=avaInto(el('div','ava'),{avatar:p.avatar,icon:p.icon,text:ini(p.label,p.id)});av.style.background=color(p.id);
-      const rc=el('span','reach'+(p.online?' on':''));av.append(rc);
       const g=el('div','grow');const r1=el('div','r1');const n=el('div','nm'+(p.unread?' unread':''));n.textContent=p.label||nm(p.id);const tm=el('div','time');tm.textContent=ts(p.lastActivity);r1.append(n,tm);
-      // 連絡先に載っている＝engaged なので、状態のラベルは出さない（到達可否だけ）。
-      const r2=el('div','r2');const s2=el('span');s2.textContent=p.online?t('Reachable'):t('Away');r2.append(s2);
+      // 次にすることだけを出す：まだの手紙の数／相手の承認待ち。どちらも無ければ何も出さない。
+      const r2=el('div','r2');if(p.unread){const s2=el('span');s2.style.cssText='color:var(--blue);font-weight:700';s2.textContent=tf('{n} to handle',{n:p.unread});r2.append(s2);}
+      if(p.category==='report'){const s3=el('span');s3.textContent=t('Automatic reports');r2.append(s3);}
       if(p.awaiting){const w=el('span');w.style.cssText='color:#c05621;font-weight:700';w.textContent=t('Waiting for them to approve');r2.append(w);}  // 片側だけの縁
       g.append(r1,r2);row.append(av,g);L.append(row);
     });
@@ -307,7 +308,6 @@ async function renderMain(){
     [t('They join your Contacts and you can exchange letters.'),
      t('Your profile (name, icon, links) is sent to them.'),
      t('Incoming letters are never executed on their own. You decide every time whether your AI reads one.'),
-     t('Your online status is hidden by default (you can open it per contact in settings).'),
      t('You can release the bond later from contact settings.')].forEach(s=>{const li=el('div');li.textContent='• '+s;ul.append(li);});
     c3.append(ul);body.append(c3);
     M.append(body);
@@ -325,9 +325,12 @@ async function renderMain(){
     const L=await (await fetch('/api/letter?pair='+encodeURIComponent(sel.pair)+'&id='+encodeURIComponent(sel.id))).json();
     M.textContent='';
     const av=avaInto(el('div','m-ava'),{avatar:sel.avatar,icon:sel.icon,text:ini(sel.label,sel.pair)});av.style.background=color(sel.pair);
-    const iStat=sel.triage==='applied'?t('✓ Handed'):(sel.triage==='declined'?t('✕ Declined'):(sel.unread!==false?t('Unhandled'):t('Opened')));
-    const iCls=sel.triage==='applied'?'ok':(sel.triage==='declined'?'no':'');
-    M.append(mHead(av,(L.label||nm(sel.pair)),ts(L.at),iStat,iCls,()=>openProfile(sel.pair)));
+    const iStat=letterState(sel);
+    const iCls=sel.triage==='declined'?'no':(sel.done?'ok':'');
+    const head=mHead(av,(L.label||nm(sel.pair)),ts(L.at),iStat,iCls);
+    // めったに使わない「別の連絡手段で確かめる」は、下の大きなボタンから送り主の名前の横へ。
+    {const vf=el('button','pairset');vf.textContent=t('Ask them directly');vf.title=t('Ask the sender out of band');vf.onclick=()=>openVerify(sel.pair,sel.id,L);vf.style.cssText='margin-left:10px;padding:3px 9px;font-size:11px;vertical-align:2px';head.querySelector('.m-title').append(vf);}
+    M.append(head);
     const body=el('div','m-body');
     if(L.suspicious&&L.suspicious.flag){const w=el('div','flagbar');w.textContent=tf('⚠ suspicious: {reason} (review carefully before acting)',{reason:L.suspicious.reason||''});body.append(w);}
     const rl=replyLine(L.reply);if(rl)body.append(rl);
@@ -353,21 +356,14 @@ async function renderMain(){
     });
     body.append(qr);
     M.append(body);
-    refreshBadge(); // 開いた＝既読になったのでバッジ/一覧を即更新
-    const acts=el('div','m-actions');
-    // 済んだ手紙では、同じ強さでボタンを並べない（もう一度渡すことはできる）。
-    const done=sel.triage==='applied'||sel.triage==='declined';
-    const ap=el('button','btn '+(done?'decline':'apply'));ap.textContent=done&&sel.triage==='applied'?t('Hand to another AI too'):t('Hand to my AI');ap.onclick=()=>openTabs(sel.pair,sel.id);
-    const dc=el('button','btn decline');dc.textContent=t('Not this one');dc.onclick=()=>openDecline(sel.pair,sel.id);if(done)dc.style.display='none';
-    const vf=el('button','btn verify');vf.textContent=t('Ask the sender out of band');vf.onclick=()=>openVerify(sel.pair,sel.id,L);
-    acts.append(ap,dc,vf);M.append(acts);
+    M.append(await letterActions(sel,L));
   }else if(sel.type==='pair'){
     const P=await (await fetch('/api/pair?id='+encodeURIComponent(sel.pair))).json();
     M.textContent='';
     const p=cache.pairs.find(x=>x.id===sel.pair)||{};
     if(imgOk(p.banner)){const bn=el('div','detail-banner');const im=el('img');im.src=p.banner;bn.append(im);M.append(bn);}
     const av=avaInto(el('div','m-ava'),{avatar:p.avatar,icon:p.icon,text:ini(p.label,sel.pair)});av.style.background=color(sel.pair);
-    M.append(mHead(av,(p.label||nm(sel.pair)),(P.online?t('Reachable'):t('Away')),undefined,undefined,()=>openProfile(sel.pair)));
+    M.append(mHead(av,(p.label||nm(sel.pair)),pairMeta(P,p)));
     const body=el('div','m-body');{const aw=typeof awaitingCard==='function'?awaitingCard(P,sel.pair):null;if(aw)body.append(aw);}
     // やり取り履歴（日付ごと・10件ずつ・最新ページから遡る）＝voice-code版と同じ見せ方。
     const msgsAll=P.messages||[];
@@ -423,7 +419,7 @@ async function renderMain(){
   }else{
     M.textContent='';const label={sent:t('Unread'),read:t('✓ Read'),declined:t('✕ Was declined'),unsent:t('↩ Recalled')};
     const av=avaInto(el('div','m-ava'),{avatar:sel.avatar,icon:sel.icon,text:ini(sel.label,sel.pair)});av.style.background=color(sel.pair);
-    M.append(mHead(av,tf('To {name}',{name:sel.label||nm(sel.pair)}),ts(sel.at)+' · '+(label[sel.status]||sel.status),undefined,undefined,()=>openProfile(sel.pair)));
+    M.append(mHead(av,tf('To {name}',{name:sel.label||nm(sel.pair)}),ts(sel.at)+' · '+(label[sel.status]||sel.status)));
     const body=el('div','m-body');const srl=replyLine(sel.reply);if(srl)body.append(srl);const p=el('div','letter');p.textContent=(sel.body||'').replace(/^【[^】]*】/,'');body.append(p);
     if(sel.status==='declined'&&sel.reason){const r=el('div','inqlog');const line=el('div','inqline');line.textContent=tf('From them: {reason}',{reason:sel.reason});r.append(line);body.append(r);}
     M.append(body);
