@@ -24,6 +24,7 @@
 
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { root, identityPath, pairPaths } from '../lib/paths.js';
 import {
@@ -325,7 +326,11 @@ async function cmdDaemon(flags) {
       if (!/^[0-9a-f]{40}$/.test(remote)) return;
       if (m) {                             // アプリ組：版の刻印と GitHub の最新を比べる
         const head = remote.slice(0, 7);
-        if (!head.startsWith(m[1].slice(0, 7)) && !m[1].startsWith(head)) await say(t('bump update available — open the app to apply'));
+        if (!head.startsWith(m[1].slice(0, 7)) && !m[1].startsWith(head)) {
+          // voice-code の install.sh が入れた bump はアプリが無い。その台本をもう一度通すと更新される。
+          const viaVc = await readFile(join(homedir(), '.bump-hub', 'installed-by-voice-code'), 'utf8').then(() => true, () => false);
+          await say(t(viaVc ? 'bump update available — run voice-code ./install.sh again to apply' : 'bump update available — open the app to apply'));
+        }
         return;
       }
       // git で使う人（clone 組）：GitHub の最新コミットが手元に無ければ遅れている。
