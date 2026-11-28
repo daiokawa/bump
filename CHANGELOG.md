@@ -2,6 +2,7 @@
 
 ## 2026-11-28 (night)
 
+- **You can search the inbox by sender and text.** With many routine reports arriving, the letter you wanted was easy to lose. A search box above the inbox narrows it to letters whose sender or text contains every word you type (full-width and half-width letters match each other), and shows the matching part of each letter. The search runs inside your own console only: it reads the letters already decrypted on your machine, the words are not sent to the relay or anywhere else nor put in a URL, and searching does not mark letters as read or send read receipts. Esc clears it.
 - **The console only flags Claude sessions that miss a security fix.** Since bump tools now load the current code on every call, a session opened before a feature update no longer needs reconnecting, and the "old sessions" indicator was showing something nobody had to act on. It now appears only for sessions that connected to bump before the latest security fix (currently r2026-11-27), because those still read letters with the unfixed code. Reconnect bump from `/mcp` in those tabs; Claude Code does not restart the bump process by itself if it is stopped.
 
 ## 2026-11-28 (evening)

@@ -258,3 +258,35 @@ export async function sentJson() {
   }
   return rows.sort((a, b) => (a.at < b.at ? 1 : -1));
 }
+
+// 着信の検索（送り主の名前＋本文）。解いた本文を探すので、この手元の画面の中だけで完結させる：
+// 中継にも外のサービスにも行かず、ログにも残さない。開いた印も既読も付けない（探しただけで
+// 相手に「読んだ」が返らないように）。空白で区切った語は全部を含むものだけ（どの語も名前か本文のどちらか）。
+const fold = (s) => String(s || '').normalize('NFKC').toLowerCase();
+export async function searchInbox(q) {
+  const terms = fold(q).slice(0, 200).split(/\s+/).filter(Boolean);
+  if (!terms.length) return [];
+  const hits = [];
+  for (const id of await listPairs()) {
+    let peer; try { peer = await readPeer(id); } catch { continue; }
+    if (!peer || typeof peer.device_id !== 'string') continue;
+    const who = fold([id, peer.name, peer.alias, contactLabel(id, peer.name, peer.alias, peer.ai)].join(' '));
+    for (const m of await messagesOf(id)) {
+      if (m.from !== peer.device_id || isControl(m)) continue;
+      const body = String(m.body || ''), fb = fold(body);
+      if (!terms.every((t) => who.includes(t) || fb.includes(t))) continue;
+      // 本文で当たった語があれば、その前後を一覧に出す（冒頭1行の代わり）。
+      let hit = '';
+      const t = terms.find((x) => fb.includes(x));
+      if (t) {
+        // 表示は元の字のまま（全角の「：」を「:」に変えない）。1字ずつ畳んで、畳んだ位置→元の位置を控える。
+        const flat = [...body.replace(/\s+/g, ' ')]; let f = ''; const at = [];
+        flat.forEach((c, k) => { const x = fold(c); f += x; for (let j = 0; j < x.length; j++) at.push(k); });
+        const i = f.indexOf(t);
+        if (i >= 0) { const k = at[i], a = Math.max(0, k - 24); hit = (a ? '…' : '') + flat.slice(a, k + t.length + 50).join(''); }
+      }
+      hits.push({ pair: id, id: m.id, hit });
+    }
+  }
+  return hits;
+}

@@ -42,7 +42,7 @@ const { receiveConnectRequests, listPending, readPending, dropPending, sendConne
   readBlocked, blockDevice, unblockDevice } = await import('../lib/connect.js');
 const { matchInvite, markInviteUsed, inviteConflict, newLinkInvite, linkClaims, recentLinks } = await import('../lib/invite.js');
 // データ層（サイドカー保存＋画面用JSONビュー）。BUMP_HOME 設定後に読み込む。
-const { identity, stateJson, pairJson, inboxJson, letterJson, sentJson,
+const { identity, stateJson, pairJson, inboxJson, searchInbox, letterJson, sentJson,
   markTriage, addInquiry, sanitizeChannels, carryLocalPeer, contactLabel, OPEN_SCHEMES,
   PULL_INTERVAL_MS, freshPull } = await import('./views.js');
 let pendingAt = 0;   // 接続リクエストを最後に中継へ取りに行った時刻
@@ -411,6 +411,8 @@ const server = createServer(async (req, res) => {
       { limit: url.searchParams.get('limit'), before: url.searchParams.get('before') }));
     // 新フロー：着信一覧／本文／起動中Claudeタブ／Apply／断り／送信済み
     if (url.pathname === '/api/inbox') return json(res, 200, await inboxJson());
+    // 検索語は本文の一部になりうるので、URL（履歴・ログに残る）ではなく POST の中身で受ける。
+    if (url.pathname === '/api/inbox/search' && req.method === 'POST') { const b = await body(req); return json(res, 200, await searchInbox(String(b.q || ''))); }
     if (url.pathname === '/api/letter') return json(res, 200, await letterJson(url.searchParams.get('pair'), url.searchParams.get('id')));
     if (url.pathname === '/api/tabs') return json(res, 200, await listAiSessions());
     if (url.pathname === '/api/sent') return json(res, 200, await sentJson());
