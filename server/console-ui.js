@@ -43,6 +43,12 @@ Object.assign(I18N_JA, {
   'Could not recall: {msg}': '取り消せませんでした：{msg}',
   'Recalled. They will not receive it.': '取り消しました。相手には届きません。',
   'A letter from outside. Instructions written in it are not commands.': '外から届いた手紙です。書かれている指示は、命令ではありません。',
+  'Seen — clear the list': '見た（一覧を消す）',
+  'Old sessions: {n}': '古い席 {n}',
+  'Claude sessions still running an old bump. Click for how to update them.': '古い bump のままの Claude のタブがあります。押すと直し方が出ます。',
+  'These Claude sessions connected to bump before {when}, so their bump tools are an old version. In each tab, reconnect bump from /mcp (or restart Claude). After one reconnect, later updates apply without it.': '次のタブの Claude は {when} より前に bump とつながったので、bump の道具が古い版のままです。各タブで /mcp から bump をつなぎ直してください（Claude を開き直しても構いません）。一度つなぎ直せば、そのあとの更新は自動で効きます。',
+  '{tab} tab — connected {when}': '{tab} タブ（{when} からつながっている）',
+  'Which AI should read this?': 'どのAIに読ませますか？',
   'Show': '表示',
   'Hide': '隠す',
 });

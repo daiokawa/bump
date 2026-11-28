@@ -30,9 +30,9 @@ const { sendMessage, sendReceipt, receiptsEnabled, sendProfile, sendPackage, uns
 const { buildPackage, listPackages, discardPackage, MAX_PAYLOAD_BYTES } = await import('../lib/package.js');
 const { pushToRelay, replayStrays } = await import('../lib/relay.js');
 const { signedBundle, verifyBundle } = await import('../lib/crypto.js');
-const { listClaudeSessions } = await import('../lib/sessions.js');
+const { listAiSessions } = await import('../lib/sessions.js');
 const { tmuxNotify } = await import('../lib/notify.js');
-const { warn, warner, recentWarnings } = await import('../lib/log.js');
+const { warn, warner, recentWarnings, clearWarnings } = await import('../lib/log.js');
 const { freeBytes, hasRoom, humanBytes, MIN_FREE_BYTES } = await import('../lib/disk.js');
 const { staleMcp } = await import('../lib/stale-mcp.js');
 const { appVersion } = await import('../lib/version.js');
@@ -170,6 +170,8 @@ const server = createServer(async (req, res) => {
         used: l.claims.map((d) => byDev[d] || { state: 'gone', name: d.slice(0, 6) }) }));
       return json(res, 200, out);
     }
+    // 「うまくいかなかったこと」の一覧を、見たので消す（同じものはまた起きれば出る）。
+    if (url.pathname === '/api/warnings/clear' && req.method === 'POST') { clearWarnings(); return json(res, 200, { cleared: true }); }
     if (url.pathname === '/api/profile' && req.method === 'GET') return json(res, 200, await readProfile());
     if (url.pathname === '/api/profile' && req.method === 'POST') {
       const b = await body(req);
@@ -408,12 +410,14 @@ const server = createServer(async (req, res) => {
     // 新フロー：着信一覧／本文／起動中Claudeタブ／Apply／断り／送信済み
     if (url.pathname === '/api/inbox') return json(res, 200, await inboxJson());
     if (url.pathname === '/api/letter') return json(res, 200, await letterJson(url.searchParams.get('pair'), url.searchParams.get('id')));
-    if (url.pathname === '/api/tabs') return json(res, 200, await listClaudeSessions());
+    if (url.pathname === '/api/tabs') return json(res, 200, await listAiSessions());
     if (url.pathname === '/api/sent') return json(res, 200, await sentJson());
     if (url.pathname === '/api/apply' && req.method === 'POST') {
       const b = await body(req);
       const L = await letterJson(b.pair, b.id);
       if (L.error) return json(res, 404, L);
+      // 渡せるのは手元AIが動いているタブだけ。シェルのタブに貼って Enter を送ると、手紙の行がコマンドとして走りうる。
+      if (!(await listAiSessions()).some((x) => x.session === b.tab)) return json(res, 400, { error: t('That tab is not running an AI.') });
       await tmuxNotify(b.tab, framedLetter(b.pair, L), true);
       await markTriage(b.pair, b.id, 'applied');
       // 既読は「開いた時点」で送信済み（letterJson）。Applyでは重ねて送らない。

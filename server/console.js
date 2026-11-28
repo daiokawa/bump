@@ -79,7 +79,10 @@ async function refreshHealth(){
     const box=el('div','inqlog');
     w.forEach(x=>{const line=el('div','inqline');line.textContent=ts(x.at)+' | '+x.scope+': '+x.message;box.append(line);});
     panel.append(box);
-    const acts=el('div','cropacts');const c=el('button','btn');c.style.cssText='flex:1;background:#eef2f6;color:#46586a';c.textContent=t('Close');c.onclick=()=>scrim.remove();acts.append(c);panel.append(acts);
+    const acts=el('div','cropacts');const c=el('button','btn');c.style.cssText='flex:1;background:#eef2f6;color:#46586a';c.textContent=t('Close');c.onclick=()=>scrim.remove();
+    const seen=el('button','btn apply');seen.style.flex='1';seen.textContent=t('Seen — clear the list');
+    seen.onclick=async()=>{seen.disabled=true;try{await postJson('/api/warnings/clear',{});scrim.remove();refreshHealth();}catch(e){toast(e.message,'err');seen.disabled=false;}};
+    acts.append(c,seen);panel.append(acts);addClose(scrim,panel);
     scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);
   };
 }
@@ -89,14 +92,14 @@ async function refreshHealth(){
 function renderStale(s){
   const b=$('staleBtn');
   if(!s||!s.stale||!s.stale.length){b.style.display='none';return;}
-  b.style.display='';b.textContent='⟳ '+s.stale.length;
+  b.style.display='';b.textContent=tf('Old sessions: {n}',{n:s.stale.length});b.title=t('Claude sessions still running an old bump. Click for how to update them.');
   b.onclick=()=>{
     const scrim=el('div','cropscrim'),panel=el('div','croppanel');panel.style.cssText='max-width:560px;width:min(560px,calc(100vw - 40px))';
     const hd=el('div','crophd');hd.textContent=tf('{n} session(s) running old code',{n:s.stale.length});
-    const sub=el('div','cropsub');sub.textContent=tf('These MCP processes started before the last update was applied ({when}), so they are still running the old code — too old to even say so themselves. Restart those Claude sessions to load the new version.',{when:ts(s.applied_at)});
+    const sub=el('div','cropsub');sub.style.lineHeight='1.8';sub.textContent=tf('These Claude sessions connected to bump before {when}, so their bump tools are an old version. In each tab, reconnect bump from /mcp (or restart Claude). After one reconnect, later updates apply without it.',{when:ts(s.applied_at)});
     panel.append(hd,sub);
     const box=el('div','inqlog');
-    s.stale.forEach(x=>{const line=el('div','inqline');line.textContent=tf('PID {pid} — started {when}',{pid:x.pid,when:ts(x.started_at)});box.append(line);});
+    s.stale.forEach(x=>{const line=el('div','inqline');line.textContent=x.tab?tf('{tab} tab — connected {when}',{tab:x.tab,when:ts(x.started_at)}):tf('PID {pid} — started {when}',{pid:x.pid,when:ts(x.started_at)});box.append(line);});
     panel.append(box);
     const acts=el('div','cropacts');const c=el('button','btn');c.style.cssText='flex:1;background:#eef2f6;color:#46586a';c.textContent=t('Close');c.onclick=()=>scrim.remove();acts.append(c);panel.append(acts);
     scrim.append(panel);scrim.addEventListener('pointerdown',(e)=>{if(e.target===scrim)scrim.remove();});document.body.append(scrim);

@@ -171,9 +171,9 @@ async function openTabs(pair,id){
     };
     list.append(e,btn);
   }
-  else { $('tabHd').textContent=t('Which Claude should read this?'); $('tabSub').textContent=t('Inspected, framed as external data, and fed into the tab you choose.'); }
+  else { $('tabHd').textContent=t('Which AI should read this?'); $('tabSub').textContent=t('Inspected, framed as external data, and fed into the tab you choose.'); }
   tabs.forEach(t7=>{
-    const row=el('div','tabrow');const av=el('div','tabav');av.textContent='🖥';const box=el('div');const n=el('div','tn');n.textContent=t7.session;const c=el('div','tc');c.textContent=t7.cwd;box.append(n,c);row.append(av,box);
+    const row=el('div','tabrow');const av=el('div','tabav');av.textContent='🖥';const box=el('div');const n=el('div','tn');n.textContent=t7.session+(t7.ai?' · '+t7.ai:'');const c=el('div','tc');c.textContent=t7.cwd;box.append(n,c);row.append(av,box);
     row.onclick=async()=>{if(row.dataset.busy)return;row.dataset.busy='1';row.style.opacity='.5';
       try{await postJson('/api/apply',{pair,id,tab:t7.session});closeAll();toast(tf('Handed to the {tab} tab.',{tab:t7.session}));refreshBadge();loadList();renderMain();}
       catch(e){delete row.dataset.busy;row.style.opacity='';toast(tf('Could not hand it over: {msg}',{msg:e.message}),'err');}};
